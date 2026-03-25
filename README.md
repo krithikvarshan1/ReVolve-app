@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 # ReVolve - AI-Powered Product Lifecycle Management System
 
 A comprehensive Flutter application for monitoring IoT sensor data, predicting product lifecycle using machine learning, detecting anomalies, and performing automated safety actions.
@@ -326,7 +325,3 @@ For support and questions:
 - Create an issue in the repository
 - Check the documentation
 - Review the code comments for implementation details
-=======
-# ReVolve
-Product lifecycle tracker
->>>>>>> ad5777a65f035435a0808eceb10f424b73c6871f

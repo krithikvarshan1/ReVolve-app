@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_core/firebase_core.dart';
 import 'package:provider/provider.dart';
 import 'config/app_config.dart';
+import 'config/firebase_bootstrap.dart';
 import 'providers/auth_provider.dart';
 import 'providers/sensor_provider.dart';
 import 'providers/alert_provider.dart';
@@ -12,12 +12,14 @@ import 'screens/dashboard_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp();
-  runApp(const MyApp());
+  final firebaseResult = await FirebaseBootstrap.initialize();
+  runApp(MyApp(firebaseMessage: firebaseResult.message));
 }
 
 class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+  const MyApp({super.key, this.firebaseMessage});
+
+  final String? firebaseMessage;
 
   @override
   Widget build(BuildContext context) {
@@ -38,11 +40,17 @@ class MyApp extends StatelessWidget {
           useMaterial3: true,
         ),
         themeMode: ThemeMode.system,
-        initialRoute: AppRoutes.login,
-        routes: AppRoutes.routes,
+        routes: {
+          AppRoutes.login: (context) => LoginScreen(
+                firebaseMessage: firebaseMessage,
+              ),
+          AppRoutes.dashboard: (context) => const DashboardScreen(),
+        },
         home: Consumer<AuthProvider>(
           builder: (context, auth, _) {
-            return auth.isAuthenticated ? const DashboardScreen() : const LoginScreen();
+            return auth.isAuthenticated
+                ? const DashboardScreen()
+                : LoginScreen(firebaseMessage: firebaseMessage);
           },
         ),
       ),

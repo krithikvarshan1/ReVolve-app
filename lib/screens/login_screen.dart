@@ -5,7 +5,9 @@ import '../widgets/custom_button.dart';
 import '../widgets/custom_text_field.dart';
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+  const LoginScreen({super.key, this.firebaseMessage});
+
+  final String? firebaseMessage;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -69,6 +71,22 @@ class _LoginScreenState extends State<LoginScreen> {
                       style: Theme.of(context).textTheme.bodyMedium,
                       textAlign: TextAlign.center,
                     ),
+                    if (widget.firebaseMessage != null) ...[
+                      const SizedBox(height: 16),
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.amber.shade100,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.amber.shade300),
+                        ),
+                        child: Text(
+                          widget.firebaseMessage!,
+                          style: Theme.of(context).textTheme.bodyMedium,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 32),
                     if (_isSignUp)
                       CustomTextField(
@@ -109,7 +127,9 @@ class _LoginScreenState extends State<LoginScreen> {
                     Consumer<AuthProvider>(
                       builder: (context, auth, _) {
                         return ElevatedButton.icon(
-                          onPressed: auth.isLoading ? null : _handleBiometricAuth,
+                          onPressed: auth.isLoading || widget.firebaseMessage != null
+                              ? null
+                              : _handleBiometricAuth,
                           icon: const Icon(Icons.fingerprint),
                           label: const Text('Biometric Login'),
                           style: ElevatedButton.styleFrom(
@@ -172,6 +192,15 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _handleBiometricAuth() async {
+    if (widget.firebaseMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Configure Firebase first before using authentication.'),
+        ),
+      );
+      return;
+    }
+
     try {
       final auth = context.read<AuthProvider>();
       final success = await auth.authenticateWithBiometrics();

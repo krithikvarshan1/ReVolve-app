@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import '../config/app_config.dart';
 import '../models/sensor_data.dart';
 import '../models/alert.dart';
@@ -6,12 +7,24 @@ import '../models/device.dart';
 import '../models/ml_prediction.dart';
 
 class FirebaseService {
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  FirebaseFirestore? get _firestoreOrNull {
+    if (Firebase.apps.isEmpty) {
+      return null;
+    }
+    return FirebaseFirestore.instance;
+  }
+
+  bool get isAvailable => _firestoreOrNull != null;
 
   // Sensor Data Operations
   Future<void> saveSensorData(SensorData data) async {
+    final firestore = _firestoreOrNull;
+    if (firestore == null) {
+      return;
+    }
+
     try {
-      await _firestore
+      await firestore
           .collection(AppConfig.sensorDataCollection)
           .doc(data.id)
           .set(data.toJson());
@@ -22,7 +35,12 @@ class FirebaseService {
   }
 
   Stream<List<SensorData>> getSensorDataStream(String deviceId) {
-    return _firestore
+    final firestore = _firestoreOrNull;
+    if (firestore == null) {
+      return const Stream<List<SensorData>>.empty();
+    }
+
+    return firestore
         .collection(AppConfig.sensorDataCollection)
         .where('deviceId', isEqualTo: deviceId)
         .orderBy('timestamp', descending: true)
@@ -35,8 +53,13 @@ class FirebaseService {
 
   // Alert Operations
   Future<void> saveAlert(Alert alert) async {
+    final firestore = _firestoreOrNull;
+    if (firestore == null) {
+      return;
+    }
+
     try {
-      await _firestore
+      await firestore
           .collection(AppConfig.alertsCollection)
           .doc(alert.id)
           .set(alert.toJson());
@@ -47,7 +70,12 @@ class FirebaseService {
   }
 
   Stream<List<Alert>> getAlertsStream(String deviceId) {
-    return _firestore
+    final firestore = _firestoreOrNull;
+    if (firestore == null) {
+      return const Stream<List<Alert>>.empty();
+    }
+
+    return firestore
         .collection(AppConfig.alertsCollection)
         .where('deviceId', isEqualTo: deviceId)
         .orderBy('timestamp', descending: true)
@@ -58,8 +86,13 @@ class FirebaseService {
   }
 
   Future<void> resolveAlert(String alertId) async {
+    final firestore = _firestoreOrNull;
+    if (firestore == null) {
+      return;
+    }
+
     try {
-      await _firestore
+      await firestore
           .collection(AppConfig.alertsCollection)
           .doc(alertId)
           .update({'isResolved': true});
@@ -71,8 +104,13 @@ class FirebaseService {
 
   // Device Operations
   Future<void> saveDevice(Device device) async {
+    final firestore = _firestoreOrNull;
+    if (firestore == null) {
+      return;
+    }
+
     try {
-      await _firestore
+      await firestore
           .collection(AppConfig.devicesCollection)
           .doc(device.id)
           .set(device.toJson());
@@ -83,7 +121,12 @@ class FirebaseService {
   }
 
   Stream<List<Device>> getDevicesStream() {
-    return _firestore
+    final firestore = _firestoreOrNull;
+    if (firestore == null) {
+      return const Stream<List<Device>>.empty();
+    }
+
+    return firestore
         .collection(AppConfig.devicesCollection)
         .snapshots()
         .map((snapshot) => snapshot.docs
@@ -92,8 +135,13 @@ class FirebaseService {
   }
 
   Future<void> updateDeviceRelay(String deviceId, bool status) async {
+    final firestore = _firestoreOrNull;
+    if (firestore == null) {
+      return;
+    }
+
     try {
-      await _firestore
+      await firestore
           .collection(AppConfig.devicesCollection)
           .doc(deviceId)
           .update({
@@ -108,8 +156,13 @@ class FirebaseService {
 
   // ML Prediction Operations
   Future<void> saveMLPrediction(MLPrediction prediction) async {
+    final firestore = _firestoreOrNull;
+    if (firestore == null) {
+      return;
+    }
+
     try {
-      await _firestore
+      await firestore
           .collection('ml_predictions') // Could be separate collection
           .doc(prediction.id)
           .set(prediction.toJson());
@@ -121,8 +174,13 @@ class FirebaseService {
 
   // Usage Logs
   Future<void> logUsage(String deviceId, String action, Map<String, dynamic> details) async {
+    final firestore = _firestoreOrNull;
+    if (firestore == null) {
+      return;
+    }
+
     try {
-      await _firestore.collection(AppConfig.logsCollection).add({
+      await firestore.collection(AppConfig.logsCollection).add({
         'deviceId': deviceId,
         'action': action,
         'details': details,
@@ -136,9 +194,14 @@ class FirebaseService {
 
   // Batch operations for efficiency
   Future<void> saveSensorDataBatch(List<SensorData> dataList) async {
-    final batch = _firestore.batch();
+    final firestore = _firestoreOrNull;
+    if (firestore == null) {
+      return;
+    }
+
+    final batch = firestore.batch();
     for (final data in dataList) {
-      final docRef = _firestore.collection(AppConfig.sensorDataCollection).doc(data.id);
+      final docRef = firestore.collection(AppConfig.sensorDataCollection).doc(data.id);
       batch.set(docRef, data.toJson());
     }
     await batch.commit();
