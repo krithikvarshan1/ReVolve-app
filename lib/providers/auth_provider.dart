@@ -1,13 +1,13 @@
 import 'package:flutter/material.dart';
-import '../models/user.dart';
+import '../models/user.dart' as UserModel;
 import '../services/auth_service.dart';
 
 class AuthProvider with ChangeNotifier {
   final AuthService _authService = AuthService();
-  User? _user;
+  UserModel.User? _user;
   bool _isLoading = false;
 
-  User? get user => _user;
+  UserModel.User? get user => _user;
   bool get isLoading => _isLoading;
   bool get isAuthenticated => _user != null;
 
@@ -16,8 +16,8 @@ class AuthProvider with ChangeNotifier {
   }
 
   void _init() {
-    _authService.authStateChanges.listen((firebaseUser) {
-      _user = firebaseUser != null ? User.fromFirebase(firebaseUser) : null;
+    _authService.authStateChanges.listen((appUser) {
+      _user = appUser;
       notifyListeners();
     });
   }

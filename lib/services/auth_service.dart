@@ -1,22 +1,22 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:local_auth/local_auth.dart';
-import '../models/user.dart';
+import '../models/user.dart' as UserModel;
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final LocalAuthentication _localAuth = LocalAuthentication();
 
   // Stream of auth state changes
-  Stream<User?> get authStateChanges => _auth.authStateChanges();
+  Stream<UserModel.User?> get authStateChanges => _auth.authStateChanges().map((firebaseUser) => firebaseUser != null ? UserModel.User.fromFirebase(firebaseUser) : null);
 
   // Current user
-  User? get currentUser {
+  UserModel.User? get currentUser {
     final firebaseUser = _auth.currentUser;
-    return firebaseUser != null ? User.fromFirebase(firebaseUser) : null;
+    return firebaseUser != null ? UserModel.User.fromFirebase(firebaseUser) : null;
   }
 
   // Sign up with email and password
-  Future<User?> signUp(String email, String password, String displayName) async {
+  Future<UserModel.User?> signUp(String email, String password, String displayName) async {
     try {
       final result = await _auth.createUserWithEmailAndPassword(
         email: email,
@@ -26,7 +26,7 @@ class AuthService {
       // Update display name
       await result.user?.updateDisplayName(displayName);
 
-      return User.fromFirebase(result.user!);
+      return UserModel.User.fromFirebase(result.user!);
     } catch (e) {
       print('Error signing up: $e');
       rethrow;
@@ -34,14 +34,14 @@ class AuthService {
   }
 
   // Sign in with email and password
-  Future<User?> signIn(String email, String password) async {
+  Future<UserModel.User?> signIn(String email, String password) async {
     try {
       final result = await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
 
-      return User.fromFirebase(result.user!);
+      return UserModel.User.fromFirebase(result.user!);
     } catch (e) {
       print('Error signing in: $e');
       rethrow;
