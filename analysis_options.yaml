@@ -1,0 +1,47 @@
+# This file configures the analyzer, which statically analyzes Dart code to
+# check for errors, warnings, and lints.
+#
+# The issues identified by the analyzer are surfaced in the UI of Dart-enabled
+# IDEs (https://dart.dev/tools#ides-and-editors). The analyzer can also be
+# invoked from the command line by running `flutter analyze`.
+
+# The following line activates a set of recommended lints for Flutter apps,
+# packages, and plugins designed to encourage good coding practices.
+include: package:flutter_lints/flutter.yaml
+
+linter:
+  # The lint rules applied to this project follow the Flutter Style Guide,
+  # available at: https://github.com/flutter/flutter/wiki/Style-guide-for-Flutter-repo
+
+  rules:
+    # Use `;` instead of `&&` for chaining commands
+    - prefer_single_quotes
+    - avoid_print
+    - prefer_const_constructors
+    - prefer_const_declarations
+    - use_key_in_widget_constructors
+    - prefer_final_fields
+    - unnecessary_brace_in_string_interps
+    - prefer_interpolation_to_compose_strings
+    - unnecessary_string_interpolations
+    - prefer_adjacent_string_concatenation
+    - prefer_is_empty
+    - prefer_is_not_empty
+    - avoid_function_literals_in_foreach_calls
+    - prefer_iterable_whereType
+    - prefer_generic_function_type_aliases
+    - avoid_renaming_method_parameters
+    - avoid_positional_boolean_parameters
+    - avoid_returning_null_for_void
+    - prefer_conditional_assignment
+    - prefer_null_aware_operators
+    - prefer_if_null_operators
+    - prefer_spread_collections
+    - cascade_invocations
+    - prefer_inlined_adds
+    - unnecessary_statements
+    - directives_ordering
+    - prefer_const_literals_to_create_immutables
+
+# Additional information about this file can be found at
+# https://dart.dev/guides/language/analysis-options
