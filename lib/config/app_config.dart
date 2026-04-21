@@ -2,6 +2,13 @@ class AppConfig {
   static const String appName = 'ReVolve';
   static const String appVersion = '1.0.0';
 
+  // ML Backend (set with --dart-define=ML_BACKEND_URL=http://host:8000)
+  static const String mlBackendBaseUrl = String.fromEnvironment(
+    'ML_BACKEND_URL',
+    defaultValue: 'http://127.0.0.1:8000',
+  );
+  static const String predictiveMaintenanceEndpoint = '/predictive-maintenance';
+
   // Firebase Collections
   static const String sensorDataCollection = 'sensor_data';
   static const String alertsCollection = 'alerts';

@@ -1,5 +1,16 @@
 {
+  "name": "revolve",
+  "private": true,
+  "scripts": {
+    "frontend": "flutter run -d chrome --dart-define=ML_BACKEND_URL=http://127.0.0.1:8000",
+    "dev": "concurrently -k -n BACKEND,FRONTEND -c yellow,cyan \"npm:backend\" \"npm:frontend\"",
+    "start": "npm run dev",
+    "build": "flutter build web",
+    "test": "flutter test",
+    "backend": "python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload"
+  },
   "devDependencies": {
+    "concurrently": "^9.2.1",
     "webpack": "^5.105.4",
     "webpack-cli": "^7.0.2"
   },

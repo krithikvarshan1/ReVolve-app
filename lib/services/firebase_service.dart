@@ -6,6 +6,7 @@ import '../models/alert.dart';
 import '../models/device.dart';
 import '../models/ml_prediction.dart';
 import '../models/activity_log.dart';
+import '../models/predictive_maintenance_result.dart';
 
 class FirebaseService {
   FirebaseFirestore? get _firestoreOrNull {
@@ -169,6 +170,25 @@ class FirebaseService {
           .set(prediction.toJson());
     } catch (e) {
       print('Error saving ML prediction: $e');
+      rethrow;
+    }
+  }
+
+  Future<void> savePredictiveMaintenanceResult(
+    PredictiveMaintenanceResult result,
+  ) async {
+    final firestore = _firestoreOrNull;
+    if (firestore == null) {
+      return;
+    }
+
+    try {
+      await firestore
+          .collection('predictive_maintenance_results')
+          .doc('${result.deviceId}-${result.timestamp.millisecondsSinceEpoch}')
+          .set(result.toJson());
+    } catch (e) {
+      print('Error saving predictive maintenance result: $e');
       rethrow;
     }
   }

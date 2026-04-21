@@ -1,10 +1,18 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 import 'package:local_auth/local_auth.dart';
 import '../models/user.dart' as UserModel;
 
 class AuthService {
+    GoogleSignIn? get _googleSignInOrNull {
+      if (kIsWeb) {
+        return null;
+      }
+      return GoogleSignIn();
+    }
+
   FirebaseAuth? get _authOrNull {
     if (Firebase.apps.isEmpty) {
       return null;
@@ -81,6 +89,43 @@ class AuthService {
     }
   }
 
+  // Sign in with Google
+  Future<UserModel.User?> signInWithGoogle() async {
+    final auth = _authOrNull;
+    if (auth == null) {
+      throw StateError('Firebase Auth is not configured for this platform.');
+    }
+
+    try {
+      if (kIsWeb) {
+        final provider = GoogleAuthProvider();
+        final result = await auth.signInWithPopup(provider);
+        return UserModel.User.fromFirebase(result.user!);
+      }
+
+      final googleSignIn = _googleSignInOrNull;
+      final googleUser = await googleSignIn?.signIn();
+      if (googleUser == null) {
+        throw FirebaseAuthException(
+          code: 'sign-in-cancelled',
+          message: 'Google sign-in was cancelled by the user.',
+        );
+      }
+
+      final googleAuth = await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final result = await auth.signInWithCredential(credential);
+      return UserModel.User.fromFirebase(result.user!);
+    } catch (e) {
+      print('Error signing in with Google: $e');
+      rethrow;
+    }
+  }
+
   // Sign out
   Future<void> signOut() async {
     final auth = _authOrNull;
@@ -90,6 +135,7 @@ class AuthService {
 
     try {
       await auth.signOut();
+      await _googleSignInOrNull?.signOut();
     } catch (e) {
       print('Error signing out: $e');
       rethrow;

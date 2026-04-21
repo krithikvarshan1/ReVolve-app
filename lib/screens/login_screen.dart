@@ -391,6 +391,32 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
               const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton(
+                  onPressed: _isLoading || hasFirebaseMessage
+                      ? null
+                      : _handleGoogleSignIn,
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF435F8F),
+                    minimumSize: const Size.fromHeight(50),
+                    side: BorderSide(color: Colors.white.withOpacity(0.95)),
+                    backgroundColor: Colors.white.withOpacity(0.45),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: const [
+                      _GoogleBadge(),
+                      SizedBox(width: 10),
+                      Text(
+                        'Continue with Google',
+                        style: TextStyle(fontWeight: FontWeight.w700),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
               Consumer<AuthProvider>(
                 builder: (context, auth, _) {
                   return SizedBox(
@@ -548,6 +574,9 @@ class _LoginScreenState extends State<LoginScreen> {
   String _authErrorMessage(Object error) {
     if (error is FirebaseAuthException) {
       switch (error.code) {
+        case 'popup-closed-by-user':
+        case 'sign-in-cancelled':
+          return 'Google sign-in was cancelled.';
         case 'user-not-found':
           return 'Only existing registered email addresses can sign in.';
         case 'wrong-password':
@@ -559,6 +588,34 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     }
     return 'Authentication failed. Please check your details and try again.';
+  }
+
+  Future<void> _handleGoogleSignIn() async {
+    if (widget.firebaseMessage != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Configure Firebase first before using authentication.'),
+        ),
+      );
+      return;
+    }
+
+    setState(() => _isLoading = true);
+
+    try {
+      await context.read<AuthProvider>().signInWithGoogle();
+    } catch (e) {
+      if (!mounted) {
+        return;
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_authErrorMessage(e))),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
   }
 
   Future<void> _handleBiometricAuth() async {
@@ -662,6 +719,32 @@ class _TopBar extends StatelessWidget {
           ),
         ),
       ],
+    );
+  }
+}
+
+class _GoogleBadge extends StatelessWidget {
+  const _GoogleBadge();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 22,
+      height: 22,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: const Color(0xFFD4DEEE)),
+      ),
+      alignment: Alignment.center,
+      child: const Text(
+        'G',
+        style: TextStyle(
+          fontWeight: FontWeight.w800,
+          color: Color(0xFFDB4437),
+          fontSize: 12,
+        ),
+      ),
     );
   }
 }

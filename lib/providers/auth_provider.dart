@@ -46,6 +46,18 @@ class AuthProvider with ChangeNotifier {
     }
   }
 
+  Future<void> signInWithGoogle() async {
+    _isLoading = true;
+    notifyListeners();
+
+    try {
+      _user = await _authService.signInWithGoogle();
+    } finally {
+      _isLoading = false;
+      notifyListeners();
+    }
+  }
+
   Future<bool> isRegisteredEmail(String email) async {
     return _authService.isRegisteredEmail(email);
   }

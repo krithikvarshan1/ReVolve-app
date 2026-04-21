@@ -185,6 +185,41 @@ lib/
    flutter run -d chrome
    ```
 
+### Predictive Maintenance Backend (FastAPI)
+
+The project now includes a Python backend in `backend/` that loads all trained
+models from `models_ml/` once at startup and exposes a single unified endpoint.
+
+1. **Install backend dependencies**
+   ```bash
+   pip install -r backend/requirements.txt
+   ```
+
+2. **Install Node scripts dependency (one time)**
+   ```bash
+   npm install
+   ```
+
+3. **Run backend + Flutter together**
+   ```bash
+   npm run dev
+   ```
+
+4. **Optional: run backend only**
+   ```bash
+   python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
+   ```
+
+5. **Optional: run Flutter only with backend URL**
+   ```bash
+   flutter run -d chrome --dart-define=ML_BACKEND_URL=http://127.0.0.1:8000
+   ```
+
+6. **API endpoint**
+   - `POST /predictive-maintenance`
+   - Expected sensor payload keys:
+     `temperature`, `vibration`, `current`, `gas`, `dust`, `sound`, `deviceId`
+
 ## ESP32 Hardware Integration
 
 ### Hardware Requirements

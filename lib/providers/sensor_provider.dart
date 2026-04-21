@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import '../models/sensor_data.dart';
 import '../models/alert.dart';
@@ -6,23 +8,39 @@ import '../services/firebase_service.dart';
 import '../services/ml_service.dart';
 import '../services/device_control_service.dart';
 import '../models/ml_prediction.dart';
+import '../models/predictive_maintenance_result.dart';
+import '../services/predictive_maintenance_service.dart';
 
 class SensorProvider with ChangeNotifier {
   final SensorService _sensorService = SensorService();
   final FirebaseService _firebaseService = FirebaseService();
   final MLService _mlService = MLService();
+  final PredictiveMaintenanceService _predictiveService =
+      PredictiveMaintenanceService();
   final DeviceControlService _deviceControlService = DeviceControlService();
 
   List<SensorData> _sensorHistory = [];
   SensorData? _latestData;
   MLPrediction? _latestPrediction;
+  PredictiveMaintenanceResult? _latestPredictiveResult;
+  final List<PredictiveMaintenanceResult> _predictionHistory = [];
   bool _isLoading = false;
+  bool _isPredictiveLoading = false;
+  String? _predictiveError;
   final Map<String, DateTime> _lastAlertAt = {};
 
   List<SensorData> get sensorHistory => _sensorHistory;
   SensorData? get latestData => _latestData;
   MLPrediction? get latestPrediction => _latestPrediction;
+    PredictiveMaintenanceResult? get latestPredictiveResult =>
+      _latestPredictiveResult;
+    List<PredictiveMaintenanceResult> get predictionHistory =>
+      List<PredictiveMaintenanceResult>.unmodifiable(_predictionHistory);
   bool get isLoading => _isLoading;
+    bool get isPredictiveLoading => _isPredictiveLoading;
+    String? get predictiveError => _predictiveError;
+    bool get manualSimulationEnabled => _sensorService.manualSimulationEnabled;
+    Map<String, double> get manualSimulationValues => _sensorService.manualValues;
 
   SensorProvider() {
     _init();
@@ -44,6 +62,7 @@ class SensorProvider with ChangeNotifier {
 
       // Update ML prediction
       _updatePrediction();
+      unawaited(_updatePredictiveResult(data));
       _handleSafetyAutomation(data);
 
       notifyListeners();
@@ -66,6 +85,9 @@ class SensorProvider with ChangeNotifier {
           _latestData = _sensorHistory.last;
         }
         _updatePrediction();
+        if (_latestData != null) {
+          unawaited(_updatePredictiveResult(_latestData!));
+        }
         _isLoading = false;
         notifyListeners();
       });
@@ -84,8 +106,51 @@ class SensorProvider with ChangeNotifier {
     }
   }
 
+  Future<void> _updatePredictiveResult(SensorData data) async {
+    _isPredictiveLoading = true;
+    notifyListeners();
+
+    try {
+      _latestPredictiveResult = await _predictiveService.fetchPrediction(data);
+      _predictiveError = null;
+    } catch (e) {
+      if (_latestPrediction == null) {
+        _latestPrediction = _mlService.predictLifecycle(_sensorHistory);
+      }
+      _latestPredictiveResult = PredictiveMaintenanceResult.fromLocalPrediction(
+        sensorData: data,
+        prediction: _latestPrediction!,
+      );
+      _predictiveError =
+          'Using fallback local prediction. Backend unavailable or failed.';
+    }
+
+    if (_latestPredictiveResult != null) {
+      _predictionHistory.add(_latestPredictiveResult!);
+      unawaited(
+        _firebaseService.savePredictiveMaintenanceResult(_latestPredictiveResult!),
+      );
+      if (_predictionHistory.length > 120) {
+        _predictionHistory.removeAt(0);
+      }
+    }
+
+    _isPredictiveLoading = false;
+    notifyListeners();
+  }
+
   void startSensorMonitoring() {
     _sensorService.startSensorSimulation();
+  }
+
+  void setManualSimulationEnabled(bool enabled) {
+    _sensorService.setManualSimulationEnabled(enabled);
+    notifyListeners();
+  }
+
+  void updateManualSimulationValue(String key, double value) {
+    _sensorService.updateManualSensorValue(key, value);
+    notifyListeners();
   }
 
   void stopSensorMonitoring() {
@@ -265,6 +330,7 @@ class SensorProvider with ChangeNotifier {
   @override
   void dispose() {
     _sensorService.dispose();
+    _predictiveService.dispose();
     super.dispose();
   }
 }
