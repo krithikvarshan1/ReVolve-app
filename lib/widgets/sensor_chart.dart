@@ -18,9 +18,9 @@ class SensorChart extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      elevation: 2,
+      elevation: 0,
       child: Padding(
-        padding: const EdgeInsets.all(16.0),
+        padding: const EdgeInsets.all(18.0),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -28,16 +28,29 @@ class SensorChart extends StatelessWidget {
               title,
               style: const TextStyle(
                 fontSize: 16,
-                fontWeight: FontWeight.bold,
+                fontWeight: FontWeight.w700,
               ),
             ),
             const SizedBox(height: 8),
             Expanded(
               child: data.isEmpty
-                  ? const Center(child: Text('No data available'))
+                  ? const Center(
+                      child: Text(
+                        'No data available',
+                        style: TextStyle(color: Color(0xFF64748B)),
+                      ),
+                    )
                   : LineChart(
                       LineChartData(
-                        gridData: FlGridData(show: false),
+                        gridData: FlGridData(
+                          show: true,
+                          drawVerticalLine: false,
+                          horizontalInterval: null,
+                          getDrawingHorizontalLine: (value) => const FlLine(
+                            color: Color(0xFFE2E8F0),
+                            strokeWidth: 1,
+                          ),
+                        ),
                         titlesData: FlTitlesData(
                           leftTitles: AxisTitles(
                             sideTitles: SideTitles(
@@ -46,7 +59,10 @@ class SensorChart extends StatelessWidget {
                               getTitlesWidget: (value, meta) {
                                 return Text(
                                   '${value.toStringAsFixed(1)}$unit',
-                                  style: const TextStyle(fontSize: 10),
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    color: Color(0xFF64748B),
+                                  ),
                                 );
                               },
                             ),
@@ -67,11 +83,11 @@ class SensorChart extends StatelessWidget {
                             spots: data,
                             isCurved: true,
                             color: color,
-                            barWidth: 2,
+                            barWidth: 3,
                             dotData: FlDotData(show: false),
                             belowBarData: BarAreaData(
                               show: true,
-                              color: color.withOpacity(0.1),
+                              color: color.withOpacity(0.12),
                             ),
                           ),
                         ],

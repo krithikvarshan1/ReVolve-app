@@ -20,48 +20,53 @@ class CustomTextField extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    const borderColor = Color(0xFFD1D5DB);
-    const focusColor = Color(0xFF2563EB);
-    const textColor = Color(0xFF111827);
-    const labelColor = Color(0xFF6B7280);
-    const iconColor = Color(0xFF6B7280);
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
 
     return TextFormField(
       controller: controller,
       obscureText: obscureText,
       keyboardType: keyboardType,
       validator: validator,
-      style: const TextStyle(
-        color: textColor,
-        fontSize: 16,
+      style: theme.textTheme.bodyLarge?.copyWith(
+        color: const Color(0xFF0F172A),
         fontWeight: FontWeight.w600,
       ),
       decoration: InputDecoration(
         labelText: label,
-        labelStyle: const TextStyle(
-          color: labelColor,
-          fontWeight: FontWeight.w500,
-        ),
-        floatingLabelStyle: const TextStyle(
-          color: focusColor,
+        labelStyle: theme.textTheme.bodyMedium?.copyWith(
+          color: const Color(0xFF64748B),
           fontWeight: FontWeight.w600,
         ),
-        prefixIconConstraints: const BoxConstraints(minWidth: 48),
-        prefixIcon: Icon(icon, color: iconColor),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: borderColor),
+        floatingLabelStyle: theme.textTheme.bodyMedium?.copyWith(
+          color: colorScheme.primary,
+          fontWeight: FontWeight.w700,
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: borderColor),
-        ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: const BorderSide(color: focusColor, width: 2),
-        ),
+        prefixIconConstraints: const BoxConstraints(minWidth: 52),
+        prefixIcon: Icon(icon, color: const Color(0xFF64748B)),
         filled: true,
         fillColor: Colors.white,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFFE2E8F0)),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: BorderSide(color: colorScheme.primary, width: 1.6),
+        ),
+        errorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFFDC2626)),
+        ),
+        focusedErrorBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(16),
+          borderSide: const BorderSide(color: Color(0xFFDC2626), width: 1.6),
+        ),
       ),
     );
   }

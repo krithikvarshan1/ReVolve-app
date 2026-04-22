@@ -9,16 +9,23 @@ class AlertCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      elevation: 2,
-      margin: const EdgeInsets.only(bottom: 8),
-      child: ListTile(
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+          color: Colors.white,
+        ),
+        child: ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: Icon(
           alert.icon,
           color: alert.color,
         ),
         title: Text(
           alert.title,
-          style: const TextStyle(fontWeight: FontWeight.bold),
+          style: const TextStyle(fontWeight: FontWeight.w700),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -37,17 +44,18 @@ class AlertCard extends StatelessWidget {
         trailing: Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: alert.color.withOpacity(0.1),
-            borderRadius: BorderRadius.circular(12),
+            color: alert.color.withOpacity(0.12),
+            borderRadius: BorderRadius.circular(999),
           ),
           child: Text(
             alert.severity.name.toUpperCase(),
             style: TextStyle(
               color: alert.color,
               fontSize: 12,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w800,
             ),
           ),
+        ),
         ),
       ),
     );

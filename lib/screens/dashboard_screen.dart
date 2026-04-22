@@ -49,6 +49,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
       builder: (context, sensor, alertProvider, deviceProvider, logProvider, _) {
         final alerts = _alerts(sensor, alertProvider);
         _triggerPredictiveNotification(sensor.latestPredictiveResult);
+        final isCompact = MediaQuery.sizeOf(context).width < 920;
 
         final pages = [
           _overview(sensor, alerts, deviceProvider, userName),
@@ -59,26 +60,46 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ];
 
         return Scaffold(
-          backgroundColor: const Color(0xFFF3F6FB),
+          backgroundColor: const Color(0xFFF4F7FB),
+          drawer: isCompact
+              ? Drawer(
+                  backgroundColor: Colors.transparent,
+                  elevation: 0,
+                  child: SafeArea(child: _buildSidebar(drawerMode: true)),
+                )
+              : null,
           appBar: AppBar(
             backgroundColor: Colors.transparent,
             surfaceTintColor: Colors.transparent,
             elevation: 0,
+            toolbarHeight: 76,
+            titleSpacing: isCompact ? 0 : 8,
+            leading: isCompact
+                ? Builder(
+                    builder: (context) => IconButton(
+                      onPressed: () => Scaffold.of(context).openDrawer(),
+                      icon: const Icon(Icons.menu_rounded),
+                      tooltip: 'Open navigation',
+                    ),
+                  )
+                : null,
             title: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                const Text(
+                Text(
                   'ReVolve Command Center',
-                  style: TextStyle(
-                    fontWeight: FontWeight.w800,
-                    color: Color(0xFF0F172A),
-                  ),
+                  style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF0F172A),
+                        letterSpacing: -0.4,
+                      ),
                 ),
                 Text(
                   'Welcome back, $userName',
                   style: const TextStyle(
                     fontSize: 12,
                     color: Color(0xFF64748B),
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
               ],
@@ -94,23 +115,28 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ),
             ],
           ),
-          body: Row(
-            children: [
-              _buildSidebar(),
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+          body: isCompact
+              ? SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
                   child: pages[_index],
+                )
+              : Row(
+                  children: [
+                    _buildSidebar(),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                        child: pages[_index],
+                      ),
+                    ),
+                  ],
                 ),
-              ),
-            ],
-          ),
         );
       },
     );
   }
 
-  Widget _buildSidebar() {
+  Widget _buildSidebar({bool drawerMode = false}) {
     const items = [
       (Icons.dashboard_outlined, 'Overview'),
       (Icons.warning_amber_rounded, 'Alerts'),
@@ -121,34 +147,134 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return AnimatedContainer(
       duration: const Duration(milliseconds: 220),
-      width: _navExpanded ? 220 : 84,
-      margin: const EdgeInsets.fromLTRB(16, 8, 0, 16),
+      width: drawerMode ? double.infinity : (_navExpanded ? 240 : 92),
+      margin: drawerMode
+          ? EdgeInsets.zero
+          : const EdgeInsets.fromLTRB(16, 8, 0, 16),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 16),
       decoration: BoxDecoration(
-        color: const Color(0xFF1F1C24),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x160F172A),
-            blurRadius: 20,
-            offset: Offset(0, 10),
+            color: Color(0x120F172A),
+            blurRadius: 24,
+            offset: Offset(0, 12),
           ),
         ],
       ),
       child: Column(
         children: [
-          Align(
-            alignment: _navExpanded ? Alignment.centerRight : Alignment.center,
-            child: IconButton(
-              onPressed: () => setState(() => _navExpanded = !_navExpanded),
-              icon: Icon(
-                _navExpanded ? Icons.keyboard_double_arrow_left_rounded : Icons.keyboard_double_arrow_right_rounded,
-                color: Colors.white70,
-              ),
-              tooltip: _navExpanded ? 'Collapse menu' : 'Expand menu',
+          if (_navExpanded || drawerMode)
+            Row(
+              children: [
+                const CircleAvatar(
+                  radius: 20,
+                  backgroundColor: Color(0xFFE0EAFF),
+                  child: Icon(
+                    Icons.blur_on_rounded,
+                    color: Color(0xFF1D4ED8),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'ReVolve',
+                        style: TextStyle(
+                          fontWeight: FontWeight.w800,
+                          color: Color(0xFF0F172A),
+                        ),
+                      ),
+                      SizedBox(height: 2),
+                      Text(
+                        'Operations workspace',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Color(0xFF64748B),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                IconButton(
+                  onPressed: drawerMode
+                      ? () => Navigator.of(context).pop()
+                      : () => setState(() => _navExpanded = !_navExpanded),
+                  icon: Icon(
+                    drawerMode
+                        ? Icons.close_rounded
+                        : Icons.keyboard_double_arrow_left_rounded,
+                    color: const Color(0xFF64748B),
+                  ),
+                  tooltip: drawerMode ? 'Close menu' : 'Collapse menu',
+                ),
+              ],
+            )
+          else
+            Column(
+              children: [
+                const CircleAvatar(
+                  radius: 20,
+                  backgroundColor: Color(0xFFE0EAFF),
+                  child: Icon(
+                    Icons.blur_on_rounded,
+                    color: Color(0xFF1D4ED8),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                IconButton(
+                  onPressed: () => setState(() => _navExpanded = !_navExpanded),
+                  icon: const Icon(
+                    Icons.keyboard_double_arrow_right_rounded,
+                    color: Color(0xFF64748B),
+                  ),
+                  tooltip: 'Expand menu',
+                  visualDensity: VisualDensity.compact,
+                  constraints: const BoxConstraints(minWidth: 36, minHeight: 36),
+                ),
+              ],
             ),
-          ),
-          const SizedBox(height: 8),
+          if (_navExpanded || drawerMode) ...[
+            const SizedBox(height: 16),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFFF8FAFF), Color(0xFFEFF6FF)],
+                ),
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: const Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    'Command hub',
+                    style: TextStyle(
+                      color: Color(0xFF1D4ED8),
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                  SizedBox(height: 4),
+                  Text(
+                    'Monitor alerts, devices, and live analytics from one place.',
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.4,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 14),
+          ] else
+            const SizedBox(height: 10),
           Expanded(
             child: Column(
               children: List.generate(items.length, (itemIndex) {
@@ -159,19 +285,27 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   padding: const EdgeInsets.only(bottom: 10),
                   child: InkWell(
                     borderRadius: BorderRadius.circular(18),
-                    onTap: () => setState(() => _index = itemIndex),
+                    onTap: () {
+                      setState(() => _index = itemIndex);
+                      if (drawerMode) {
+                        Navigator.of(context).pop();
+                      }
+                    },
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 220),
                       width: double.infinity,
                       padding: EdgeInsets.symmetric(
-                        horizontal: _navExpanded ? 14 : 0,
+                        horizontal: _navExpanded ? 14 : 10,
                         vertical: 14,
                       ),
                       decoration: BoxDecoration(
                         color: isSelected
-                            ? const Color(0xFF4B445E)
+                            ? const Color(0xFFEFF6FF)
                             : Colors.transparent,
                         borderRadius: BorderRadius.circular(18),
+                        border: isSelected
+                            ? Border.all(color: const Color(0xFFBFDBFE))
+                            : null,
                       ),
                       child: Row(
                         mainAxisAlignment: _navExpanded
@@ -180,7 +314,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
                         children: [
                           Icon(
                             item.$1,
-                            color: isSelected ? Colors.white : Colors.white70,
+                            color: isSelected
+                                ? const Color(0xFF1D4ED8)
+                                : const Color(0xFF64748B),
                           ),
                           if (_navExpanded) ...[
                             const SizedBox(width: 12),
@@ -188,8 +324,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                               child: Text(
                                 item.$2,
                                 style: TextStyle(
-                                  color: isSelected ? Colors.white : Colors.white70,
-                                  fontWeight: isSelected ? FontWeight.w700 : FontWeight.w500,
+                                  color: isSelected
+                                      ? const Color(0xFF1D4ED8)
+                                      : const Color(0xFF334155),
+                                  fontWeight:
+                                      isSelected ? FontWeight.w800 : FontWeight.w600,
                                 ),
                               ),
                             ),
@@ -1070,13 +1209,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
         width: double.infinity,
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: Colors.white,
+          gradient: const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [Colors.white, Color(0xFFF8FAFC)],
+          ),
           borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
           boxShadow: const [
             BoxShadow(
-              color: Color(0x120F172A),
-              blurRadius: 16,
-              offset: Offset(0, 8),
+              color: Color(0x0F0F172A),
+              blurRadius: 20,
+              offset: Offset(0, 10),
             ),
           ],
         ),
@@ -1090,13 +1234,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   fontSize: 20,
                   fontWeight: FontWeight.w800,
                   color: Color(0xFF0F172A),
+                  letterSpacing: -0.3,
                 ),
               ),
               if (subtitle != null) ...[
                 const SizedBox(height: 4),
                 Text(
                   subtitle,
-                  style: const TextStyle(color: Color(0xFF64748B)),
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    height: 1.45,
+                  ),
                 ),
               ],
               const SizedBox(height: 16),
@@ -1110,8 +1258,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
         width: 118,
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.12),
+          color: Colors.white.withOpacity(0.16),
           borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: Colors.white.withOpacity(0.14)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1141,6 +1290,14 @@ class _DashboardScreenState extends State<DashboardScreen> {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x0C0F172A),
+              blurRadius: 14,
+              offset: Offset(0, 8),
+            ),
+          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1176,6 +1333,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         decoration: BoxDecoration(
           color: const Color(0xFFF8FAFC),
           borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1205,6 +1363,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         decoration: BoxDecoration(
           color: const Color(0xFFF8FAFC),
           borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -1245,6 +1404,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
         decoration: BoxDecoration(
           color: const Color(0xFFF8FAFC),
           borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: const Color(0xFFE2E8F0)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,

@@ -36,15 +36,16 @@ class _LoginScreenState extends State<LoginScreen> {
     final hasFirebaseMessage = widget.firebaseMessage != null;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFEFF5FF),
+      backgroundColor: const Color(0xFFF4F7FB),
       body: Stack(
         children: [
           const _PageBackdrop(),
           SafeArea(
-            child: Center(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-                child: ConstrainedBox(
+            child: LayoutBuilder(
+              builder: (context, viewport) {
+                final shouldScroll = viewport.maxWidth < 980;
+
+                final content = ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 1250),
                   child: LayoutBuilder(
                     builder: (context, constraints) {
@@ -54,13 +55,13 @@ class _LoginScreenState extends State<LoginScreen> {
                         padding: EdgeInsets.all(isWide ? 22 : 14),
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(34),
-                          color: Colors.white.withOpacity(0.28),
-                          border: Border.all(color: Colors.white.withOpacity(0.72)),
+                          color: Colors.white.withOpacity(0.36),
+                          border: Border.all(color: Colors.white.withOpacity(0.8)),
                           boxShadow: const [
                             BoxShadow(
-                              color: Color(0x262867C7),
-                              blurRadius: 45,
-                              offset: Offset(0, 24),
+                              color: Color(0x1E1D4ED8),
+                              blurRadius: 42,
+                              offset: Offset(0, 22),
                             ),
                           ],
                         ),
@@ -69,17 +70,14 @@ class _LoginScreenState extends State<LoginScreen> {
                           child: BackdropFilter(
                             filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
                             child: Container(
-                              constraints: BoxConstraints(
-                                minHeight: isWide ? 720 : 0,
-                              ),
                               decoration: BoxDecoration(
                                 gradient: const LinearGradient(
                                   begin: Alignment.topLeft,
                                   end: Alignment.bottomRight,
                                   colors: [
-                                    Color(0xF6F9FCFF),
-                                    Color(0xEEF0F7FF),
-                                    Color(0xFFE0ECFF),
+                                    Color(0xFFF8FAFC),
+                                    Color(0xFFF0F7FF),
+                                    Color(0xFFEAF1FF),
                                   ],
                                 ),
                                 border: Border.all(
@@ -97,13 +95,12 @@ class _LoginScreenState extends State<LoginScreen> {
                                       isWide ? 26 : 18,
                                     ),
                                     child: Column(
-                                      mainAxisSize: MainAxisSize.min,
+                                      mainAxisSize: MainAxisSize.max,
                                       children: [
                                         _TopBar(isWide: isWide),
                                         SizedBox(height: isWide ? 30 : 22),
                                         if (isWide)
-                                          SizedBox(
-                                            height: 620,
+                                          Expanded(
                                             child: Row(
                                               crossAxisAlignment:
                                                   CrossAxisAlignment.stretch,
@@ -148,8 +145,27 @@ class _LoginScreenState extends State<LoginScreen> {
                       );
                     },
                   ),
-                ),
-              ),
+                );
+
+                if (shouldScroll) {
+                  return Center(
+                    child: SingleChildScrollView(
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                      child: content,
+                    ),
+                  );
+                }
+
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+                    child: SizedBox(
+                      height: viewport.maxHeight - 48,
+                      child: content,
+                    ),
+                  ),
+                );
+              },
             ),
           ),
         ],
@@ -206,12 +222,12 @@ class _LoginScreenState extends State<LoginScreen> {
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 470),
               child: const Text(
-                'The complete suite of enterprise management in a calmer interface.',
+                'A calmer workspace for industrial control, predictive insight, and team access.',
                 style: TextStyle(
-                  fontSize: 44,
+                  fontSize: 42,
                   height: 1.08,
-                  fontWeight: FontWeight.w400,
-                  letterSpacing: -1.7,
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: -1.4,
                   color: Color(0xFF264B84),
                 ),
               ),
@@ -220,7 +236,7 @@ class _LoginScreenState extends State<LoginScreen> {
             ConstrainedBox(
               constraints: const BoxConstraints(maxWidth: 410),
               child: const Text(
-                'Sign in to monitor devices, lifecycle signals, and team actions from one glassy workspace inspired by the reference motion design.',
+                'Sign in to monitor devices, lifecycle signals, and team activity from one polished control center.',
                 style: TextStyle(
                   color: Color(0xFF5E7CAA),
                   fontSize: 15,
@@ -239,12 +255,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 _MiniPill(label: 'Predictive models'),
               ],
             ),
-            const SizedBox(height: 56),
-          const Row(
-            children: [
-              _FooterMarker(label: 'SCROLL TO EXPLORE'),
-            ],
-          ),
+            const SizedBox(height: 26),
           ],
         ),
       ),
@@ -264,14 +275,14 @@ class _LoginScreenState extends State<LoginScreen> {
         child: Container(
           padding: const EdgeInsets.all(24),
           decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.84),
+            color: Colors.white.withOpacity(0.9),
             borderRadius: BorderRadius.circular(28),
             border: Border.all(color: Colors.white.withOpacity(0.98)),
             boxShadow: const [
               BoxShadow(
-                color: Color(0x1F6B8FD6),
-                blurRadius: 34,
-                offset: Offset(0, 20),
+                color: Color(0x186B8FD6),
+                blurRadius: 32,
+                offset: Offset(0, 18),
               ),
             ],
           ),
@@ -282,7 +293,7 @@ class _LoginScreenState extends State<LoginScreen> {
               Text(
                 _isSignUp ? 'Create Account' : 'Welcome Back',
                 style: theme.textTheme.headlineSmall?.copyWith(
-                  color: const Color(0xFF35588E),
+                  color: const Color(0xFF1E3A8A),
                   fontWeight: FontWeight.w800,
                   letterSpacing: -0.6,
                 ),
@@ -293,7 +304,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     ? 'Create your ReVolve access and join your team workspace.'
                     : 'Use your credentials to continue into the control suite.',
                 style: theme.textTheme.bodyMedium?.copyWith(
-                  color: const Color(0xFF5F79A0),
+                  color: const Color(0xFF64748B),
                   height: 1.6,
                   fontWeight: FontWeight.w600,
                 ),
@@ -336,7 +347,7 @@ class _LoginScreenState extends State<LoginScreen> {
                     _obscurePassword
                         ? Icons.visibility_outlined
                         : Icons.visibility_off_outlined,
-                    color: const Color(0xFF86A0C7),
+                    color: const Color(0xFF64748B),
                   ),
                 ),
                 onSubmitted: (_) => _handleAuth(),
@@ -349,13 +360,13 @@ class _LoginScreenState extends State<LoginScreen> {
                     borderRadius: BorderRadius.circular(999),
                     gradient: const LinearGradient(
                       colors: [
-                        Color(0xFF7A7DFF),
-                        Color(0xFF5C71FF),
+                        Color(0xFF1D4ED8),
+                        Color(0xFF2563EB),
                       ],
                     ),
                     boxShadow: const [
                       BoxShadow(
-                        color: Color(0x445C71FF),
+                        color: Color(0x332563EB),
                         blurRadius: 18,
                         offset: Offset(0, 10),
                       ),
@@ -398,10 +409,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       ? null
                       : _handleGoogleSignIn,
                   style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF435F8F),
+                    foregroundColor: const Color(0xFF334155),
                     minimumSize: const Size.fromHeight(50),
-                    side: BorderSide(color: Colors.white.withOpacity(0.95)),
-                    backgroundColor: Colors.white.withOpacity(0.45),
+                    side: const BorderSide(color: Color(0xFFDBE4F0)),
+                    backgroundColor: Colors.white.withOpacity(0.7),
                   ),
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
@@ -428,10 +439,10 @@ class _LoginScreenState extends State<LoginScreen> {
                       icon: const Icon(Icons.fingerprint_rounded, size: 18),
                       label: const Text('Biometric Login'),
                       style: OutlinedButton.styleFrom(
-                        foregroundColor: const Color(0xFF6A86B7),
+                        foregroundColor: const Color(0xFF475569),
                         minimumSize: const Size.fromHeight(50),
-                        side: BorderSide(color: Colors.white.withOpacity(0.95)),
-                        backgroundColor: Colors.white.withOpacity(0.35),
+                        side: const BorderSide(color: Color(0xFFDBE4F0)),
+                        backgroundColor: Colors.white.withOpacity(0.55),
                       ),
                     ),
                   );
@@ -450,7 +461,7 @@ class _LoginScreenState extends State<LoginScreen> {
                         ? 'Already have an account? Sign in'
                         : 'Need an account? Create one',
                     style: const TextStyle(
-                      color: Color(0xFF6C82B2),
+                      color: Color(0xFF475569),
                       fontWeight: FontWeight.w600,
                     ),
                   ),
@@ -670,14 +681,14 @@ class _TopBar extends StatelessWidget {
             Icon(
               Icons.blur_on_rounded,
               size: 22,
-              color: Color(0xFF5678B7),
+              color: Color(0xFF1D4ED8),
             ),
             SizedBox(width: 8),
             Text(
               'ReVolve',
               style: TextStyle(
-                color: Color(0xFF3B5581),
-                fontWeight: FontWeight.w700,
+                color: Color(0xFF0F172A),
+                fontWeight: FontWeight.w800,
                 fontSize: 16,
               ),
             ),
@@ -701,8 +712,8 @@ class _TopBar extends StatelessWidget {
             borderRadius: BorderRadius.all(Radius.circular(999)),
             gradient: LinearGradient(
               colors: [
-                Color(0xFF7A7DFF),
-                Color(0xFF5E6BFF),
+                Color(0xFF1D4ED8),
+                Color(0xFF2563EB),
               ],
             ),
           ),
@@ -767,25 +778,6 @@ class _NavLink extends StatelessWidget {
   }
 }
 
-class _FooterMarker extends StatelessWidget {
-  const _FooterMarker({required this.label});
-
-  final String label;
-
-  @override
-  Widget build(BuildContext context) {
-    return Text(
-      label,
-      style: const TextStyle(
-        color: Color(0xCC6E88B1),
-        fontSize: 10,
-        fontWeight: FontWeight.w700,
-        letterSpacing: 0.9,
-      ),
-    );
-  }
-}
-
 class _MiniPill extends StatelessWidget {
   const _MiniPill({required this.label});
 
@@ -822,7 +814,7 @@ class _PageBackdrop extends StatelessWidget {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            Color(0xFFF6FAFF),
+            Color(0xFFF7FAFC),
             Color(0xFFEAF2FF),
           ],
         ),
@@ -835,7 +827,7 @@ class _PageBackdrop extends StatelessWidget {
             left: -50,
             child: _BlurOrb(
               size: 260,
-              color: Color(0x558FB6FF),
+              color: Color(0x5581AFFF),
             ),
           ),
           Positioned(
@@ -843,7 +835,7 @@ class _PageBackdrop extends StatelessWidget {
             bottom: 20,
             child: _BlurOrb(
               size: 280,
-              color: Color(0x55D4C7FF),
+              color: Color(0x55B7D7FF),
             ),
           ),
           Positioned(
@@ -1090,36 +1082,36 @@ class _AuthField extends StatelessWidget {
       obscureText: obscureText,
       onSubmitted: onSubmitted,
       style: const TextStyle(
-        color: Color(0xFF5A75A3),
+        color: Color(0xFF0F172A),
         fontWeight: FontWeight.w600,
       ),
       decoration: InputDecoration(
         labelText: label,
         hintText: hint,
-        prefixIcon: Icon(icon, color: const Color(0xFF86A0C7)),
+        prefixIcon: Icon(icon, color: const Color(0xFF64748B)),
         suffixIcon: suffix,
         labelStyle: const TextStyle(
-          color: Color(0xFF89A1C5),
+          color: Color(0xFF64748B),
           fontWeight: FontWeight.w600,
         ),
         hintStyle: const TextStyle(
-          color: Color(0x8090A6C8),
+          color: Color(0x8094A3B8),
         ),
         filled: true,
-        fillColor: Colors.white.withOpacity(0.52),
+        fillColor: Colors.white.withOpacity(0.72),
         contentPadding: const EdgeInsets.symmetric(horizontal: 18, vertical: 18),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(20),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.95)),
+          borderSide: const BorderSide(color: Color(0xFFD8E2EF)),
         ),
         enabledBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(20),
-          borderSide: BorderSide(color: Colors.white.withOpacity(0.95)),
+          borderSide: const BorderSide(color: Color(0xFFD8E2EF)),
         ),
         focusedBorder: const OutlineInputBorder(
           borderRadius: BorderRadius.all(Radius.circular(20)),
           borderSide: BorderSide(
-            color: Color(0xFF8DA6FF),
+            color: Color(0xFF1D4ED8),
             width: 1.4,
           ),
         ),
