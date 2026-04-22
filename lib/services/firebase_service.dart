@@ -44,13 +44,31 @@ class FirebaseService {
 
     return firestore
         .collection(AppConfig.sensorDataCollection)
-        .where('deviceId', isEqualTo: deviceId)
-        .orderBy('timestamp', descending: true)
-        .limit(100)
+        .limit(300)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => SensorData.fromJson(doc.data()))
-            .toList());
+        .map((snapshot) {
+          final parsed = snapshot.docs
+              .map(
+                (doc) => SensorData.fromFirestoreDocument(
+                  doc.id,
+                  doc.data(),
+                  fallbackDeviceId: deviceId,
+                ),
+              )
+              .toList();
+
+          final filtered = parsed
+              .where((item) => deviceId.isEmpty || item.deviceId == deviceId)
+              .toList();
+
+          filtered.sort((a, b) => a.timestamp.compareTo(b.timestamp));
+
+          if (filtered.length <= 100) {
+            return filtered;
+          }
+
+          return filtered.sublist(filtered.length - 100);
+        });
   }
 
   // Alert Operations

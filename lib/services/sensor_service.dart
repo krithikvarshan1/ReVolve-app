@@ -20,8 +20,7 @@ class SensorService {
     'sound': 55.0,
   };
 
-  // Mock device ID
-  final String deviceId = 'device-001';
+  final String deviceId = AppConfig.sensorDeviceId;
 
   Stream<SensorData> get sensorStream => _sensorStreamController.stream;
   bool get manualSimulationEnabled => _manualSimulationEnabled;

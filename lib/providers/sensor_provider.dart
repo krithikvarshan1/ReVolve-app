@@ -11,6 +11,8 @@ import '../models/ml_prediction.dart';
 import '../models/predictive_maintenance_result.dart';
 import '../services/predictive_maintenance_service.dart';
 
+const Duration _cloudDataFreshnessWindow = Duration(seconds: 12);
+
 class SensorProvider with ChangeNotifier {
   final SensorService _sensorService = SensorService();
   final FirebaseService _firebaseService = FirebaseService();
@@ -27,6 +29,7 @@ class SensorProvider with ChangeNotifier {
   bool _isLoading = false;
   bool _isPredictiveLoading = false;
   String? _predictiveError;
+  bool _isFallbackSimulationActive = false;
   final Map<String, DateTime> _lastAlertAt = {};
 
   List<SensorData> get sensorHistory => _sensorHistory;
@@ -76,13 +79,39 @@ class SensorProvider with ChangeNotifier {
     _isLoading = true;
     notifyListeners();
 
+    if (!_firebaseService.isAvailable) {
+      _isLoading = false;
+      notifyListeners();
+      return;
+    }
+
     try {
       // Load last 50 readings from Firebase
       final stream = _firebaseService.getSensorDataStream(_sensorService.deviceId);
       stream.listen((data) {
-        _sensorHistory = data;
-        if (_sensorHistory.isNotEmpty) {
-          _latestData = _sensorHistory.last;
+        if (data.isNotEmpty) {
+          final cloudLatest = data.last;
+          final cloudDataIsFresh = _isFreshReading(cloudLatest);
+
+          // Keep fallback simulation active when cloud data is stale so
+          // dashboard values continue to move in demo/offline conditions.
+          if (cloudDataIsFresh || _sensorHistory.isEmpty) {
+            _sensorHistory = data;
+            _latestData = _sensorHistory.last;
+          }
+
+          if (cloudDataIsFresh &&
+              _isFallbackSimulationActive &&
+              !_sensorService.manualSimulationEnabled) {
+            _sensorService.stopSensorSimulation();
+            _isFallbackSimulationActive = false;
+          } else if (!cloudDataIsFresh && !_sensorService.manualSimulationEnabled) {
+            _sensorService.startSensorSimulation();
+            _isFallbackSimulationActive = true;
+          }
+        } else if (!_sensorService.manualSimulationEnabled) {
+          _sensorService.startSensorSimulation();
+          _isFallbackSimulationActive = true;
         }
         _updatePrediction();
         if (_latestData != null) {
@@ -96,6 +125,11 @@ class SensorProvider with ChangeNotifier {
       _isLoading = false;
       notifyListeners();
     }
+  }
+
+  bool _isFreshReading(SensorData data) {
+    final age = DateTime.now().difference(data.timestamp);
+    return !age.isNegative && age <= _cloudDataFreshnessWindow;
   }
 
   void _updatePrediction() {
@@ -140,7 +174,16 @@ class SensorProvider with ChangeNotifier {
   }
 
   void startSensorMonitoring() {
-    _sensorService.startSensorSimulation();
+    if (_sensorService.manualSimulationEnabled || !_firebaseService.isAvailable) {
+      _sensorService.startSensorSimulation();
+      _isFallbackSimulationActive = true;
+      return;
+    }
+
+    if (_latestData == null) {
+      _sensorService.startSensorSimulation();
+      _isFallbackSimulationActive = true;
+    }
   }
 
   void setManualSimulationEnabled(bool enabled) {
@@ -155,6 +198,7 @@ class SensorProvider with ChangeNotifier {
 
   void stopSensorMonitoring() {
     _sensorService.stopSensorSimulation();
+    _isFallbackSimulationActive = false;
   }
 
   // Get sensor data for specific time range

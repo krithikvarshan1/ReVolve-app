@@ -9,6 +9,13 @@ class AppConfig {
   );
   static const String predictiveMaintenanceEndpoint = '/predictive-maintenance';
 
+  // Optional: restrict Firebase live stream to a specific hardware device id.
+  // Leave empty to read all device documents in sensor_data.
+  static const String sensorDeviceId = String.fromEnvironment(
+    'SENSOR_DEVICE_ID',
+    defaultValue: '',
+  );
+
   // Firebase Collections
   static const String sensorDataCollection = 'sensor_data';
   static const String alertsCollection = 'alerts';
