@@ -2,9 +2,14 @@ from __future__ import annotations
 
 import os
 import pickle
+import re
+import json
+import logging
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
+from urllib import error as urlerror
+from urllib import request as urlrequest
 
 import joblib
 import numpy as np
@@ -15,6 +20,27 @@ from pydantic import BaseModel, Field
 
 
 MODEL_DIR = Path(__file__).resolve().parent.parent / "models_ml"
+LOGGER = logging.getLogger(__name__)
+
+
+def _load_env_file(path: Path) -> None:
+    if not path.exists():
+        return
+
+    for raw_line in path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+
+        key, value = line.split("=", 1)
+        key = key.strip()
+        value = value.strip().strip('"').strip("'")
+        if key and key not in os.environ:
+            os.environ[key] = value
+
+
+_load_env_file(Path(__file__).resolve().parent / ".env")
+_load_env_file(Path(__file__).resolve().parent.parent / ".env")
 
 
 class SensorInput(BaseModel):
@@ -39,6 +65,17 @@ class PredictiveResponse(BaseModel):
     forecast_series: list[float] = []
 
 
+class ChatRequest(BaseModel):
+    query: str = Field(..., min_length=2, description="User chat query")
+
+
+class ChatResponse(BaseModel):
+    answer: str
+    confidence: float
+    suggested_questions: list[str] = []
+    source: str = "fallback"
+
+
 @dataclass
 class ModelRegistry:
     fault_model: Any
@@ -49,6 +86,167 @@ class ModelRegistry:
 
 
 MODEL_REGISTRY: ModelRegistry | None = None
+
+
+CHAT_KNOWLEDGE_BASE: dict[str, dict[str, Any]] = {
+    "login": {
+        "keywords": ["login", "sign in", "signin", "account", "password", "google", "biometric"],
+        "answer": (
+            "Use the login page to sign in with email/password, Google sign-in, or biometric login. "
+            "If Firebase is not configured, social and biometric options are disabled until setup is complete."
+        ),
+    },
+    "dashboard-overview": {
+        "keywords": ["dashboard", "overview", "kpi", "health score", "rul", "risk"],
+        "answer": (
+            "The Overview section shows live KPIs: health score, failure risk, remaining useful life (RUL), "
+            "and usage window. It combines real-time sensor streams with predictive outputs."
+        ),
+    },
+    "alerts": {
+        "keywords": ["alert", "alarm", "warning", "critical", "notification"],
+        "answer": (
+            "The Alert Center lists threshold and predictive alerts. Critical predictive events trigger a high-visibility "
+            "snackbar notification in the dashboard."
+        ),
+    },
+    "devices": {
+        "keywords": ["device", "relay", "online", "offline", "map", "location"],
+        "answer": (
+            "The Devices section shows connected hardware status and relay controls. You can select a device, "
+            "toggle relay state, and view location on the map panel."
+        ),
+    },
+    "analytics": {
+        "keywords": ["analytics", "risk distribution", "anomaly rate", "prediction history", "logs"],
+        "answer": (
+            "Analytics summarizes historical predictions, anomaly rates, and risk-level distribution for admin review. "
+            "You can also inspect logs in the Logs section."
+        ),
+    },
+    "export": {
+        "keywords": ["export", "csv", "pdf", "report", "download"],
+        "answer": (
+            "Use Downloadable Reports in the dashboard to export prediction history as CSV or PDF. "
+            "Exports are generated from the latest available prediction rows."
+        ),
+    },
+    "predictive-model": {
+        "keywords": ["predictive", "model", "fault", "anomaly", "forecast", "maintenance", "ml"],
+        "answer": (
+            "ReVolve runs predictive maintenance inference for fault class, confidence, anomaly status, RUL, "
+            "forecast temperature, and maintenance recommendation."
+        ),
+    },
+}
+
+OLLAMA_HOST = os.environ.get("OLLAMA_HOST", "http://127.0.0.1:11434")
+OLLAMA_MODEL = os.environ.get("OLLAMA_MODEL", "llama3")
+
+
+def _ollama_chat_url() -> str:
+    return f"{OLLAMA_HOST.rstrip('/')}/api/chat"
+
+
+def _normalize_chat_text(text: str) -> str:
+    lowered = text.lower().strip()
+    return re.sub(r"\s+", " ", lowered)
+
+
+def _find_best_chat_answer(query: str) -> tuple[str, float]:
+    normalized = _normalize_chat_text(query)
+
+    best_answer = ""
+    best_score = 0
+    for topic in CHAT_KNOWLEDGE_BASE.values():
+        score = 0
+        for keyword in topic["keywords"]:
+            if keyword in normalized:
+                score += 1
+
+        if score > best_score:
+            best_score = score
+            best_answer = topic["answer"]
+
+    if best_score == 0:
+        return (
+            "I can help only with ReVolve app usage, such as login, dashboard sections, devices, alerts, analytics, "
+            "predictive outputs, and report export. Try asking about one of these.",
+            0.35,
+        )
+
+    confidence = min(0.95, 0.45 + best_score * 0.15)
+    return best_answer, round(confidence, 2)
+
+
+def _suggested_questions() -> list[str]:
+    return [
+        "How do I interpret health score and RUL?",
+        "How can I export reports to CSV or PDF?",
+        "What does the Alert Center show?",
+        "How do relay controls work in Devices?",
+    ]
+
+
+def _app_assistant_system_prompt() -> str:
+    return (
+        "You are ReVolve app assistant. Only answer questions related to ReVolve app usage, "
+        "screens, dashboard sections, alerts, devices, analytics, predictive maintenance outputs, "
+        "and report export workflows. "
+        "If the user asks out-of-scope questions, clearly say you can only help with ReVolve app usage. "
+        "Keep answers concise and practical."
+    )
+
+
+def _is_ollama_available() -> bool:
+    endpoint = f"{OLLAMA_HOST.rstrip('/')}/api/tags"
+    try:
+        req = urlrequest.Request(endpoint, method="GET")
+        with urlrequest.urlopen(req, timeout=4):
+            return True
+    except Exception:
+        return False
+
+
+def _call_chat_api(query: str) -> str:
+    endpoint = _ollama_chat_url()
+    payload = {
+        "model": OLLAMA_MODEL,
+        "messages": [
+            {"role": "system", "content": _app_assistant_system_prompt()},
+            {"role": "user", "content": query},
+        ],
+        "stream": False,
+        "options": {
+            "temperature": 0.2,
+            "num_predict": 500,
+        },
+    }
+
+    req = urlrequest.Request(
+        endpoint,
+        data=json.dumps(payload).encode("utf-8"),
+        headers={
+            "Content-Type": "application/json",
+        },
+        method="POST",
+    )
+
+    try:
+        with urlrequest.urlopen(req, timeout=20) as response:
+            raw = response.read().decode("utf-8")
+            body = json.loads(raw)
+    except urlerror.HTTPError as exc:
+        detail = exc.read().decode("utf-8", errors="ignore")
+        raise RuntimeError(f"Chat API HTTP error {exc.code}: {detail}") from exc
+    except Exception as exc:
+        raise RuntimeError(f"Chat API request failed: {exc}") from exc
+
+    content = str(body.get("message", {}).get("content", "")).strip()
+    if not content:
+        raise RuntimeError("Chat API returned empty content")
+
+    return content
 
 
 def _load_pickle(path: Path) -> Any:
@@ -454,12 +652,20 @@ def startup_event() -> None:
     try:
         MODEL_REGISTRY = load_models()
     except Exception as exc:
-        raise RuntimeError(f"Failed to load ML models from {MODEL_DIR}: {exc}") from exc
+        MODEL_REGISTRY = None
+        LOGGER.warning("Failed to load ML models from %s: %s", MODEL_DIR, exc)
 
 
 @app.get("/health")
 def health() -> dict[str, str]:
-    return {"status": "ok", "models": "loaded" if MODEL_REGISTRY else "missing"}
+    ollama_ready = _is_ollama_available()
+    return {
+        "status": "ok",
+        "models": "loaded" if MODEL_REGISTRY else "missing",
+        "chat_api": "ollama-active" if ollama_ready else "fallback-mode",
+        "chat_model": OLLAMA_MODEL,
+        "chat_provider": "ollama",
+    }
 
 
 @app.get("/")
@@ -468,7 +674,32 @@ def root() -> dict[str, str]:
         "message": "ReVolve Predictive Maintenance API is running.",
         "health": "/health",
         "predict": "/predictive-maintenance",
+        "chat": "/chat-assistant",
     }
+
+
+@app.post("/chat-assistant", response_model=ChatResponse)
+def chat_assistant(payload: ChatRequest) -> ChatResponse:
+    answer = ""
+    confidence = 0.0
+    source = "fallback"
+
+    try:
+        answer = _call_chat_api(payload.query)
+        confidence = 0.9
+        source = "ollama"
+    except Exception:
+        # Keep local deterministic fallback so support chat still works when the
+        # Ollama service or backend model stack is unavailable.
+        answer, confidence = _find_best_chat_answer(payload.query)
+        source = "fallback"
+
+    return ChatResponse(
+        answer=answer,
+        confidence=confidence,
+        suggested_questions=_suggested_questions(),
+        source=source,
+    )
 
 
 @app.post("/predictive-maintenance", response_model=PredictiveResponse)

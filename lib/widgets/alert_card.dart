@@ -18,25 +18,31 @@ class AlertCard extends StatelessWidget {
           color: Colors.white,
         ),
         child: ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         leading: Icon(
           alert.icon,
           color: alert.color,
         ),
         title: Text(
           alert.title,
-          style: const TextStyle(fontWeight: FontWeight.w700),
+          style: const TextStyle(
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF1E293B),
+          ),
         ),
         subtitle: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(alert.message),
+            Text(
+              alert.message,
+              style: const TextStyle(color: Color(0xFF475569)),
+            ),
             const SizedBox(height: 4),
             Text(
               _formatTimestamp(alert.timestamp),
               style: TextStyle(
                 fontSize: 12,
-                color: Colors.grey[600],
+                color: Colors.grey[700],
               ),
             ),
           ],

@@ -8,6 +8,7 @@ class AppConfig {
     defaultValue: 'http://127.0.0.1:8000',
   );
   static const String predictiveMaintenanceEndpoint = '/predictive-maintenance';
+  static const String chatbotEndpoint = '/chat-assistant';
 
   // Optional: restrict Firebase live stream to a specific hardware device id.
   // Leave empty to read all device documents in sensor_data.

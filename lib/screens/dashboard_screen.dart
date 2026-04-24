@@ -13,6 +13,7 @@ import '../providers/auth_provider.dart';
 import '../providers/device_provider.dart';
 import '../providers/log_provider.dart';
 import '../providers/sensor_provider.dart';
+import '../services/chatbot_service.dart';
 import '../services/report_export_service.dart';
 import '../widgets/alert_card.dart';
 
@@ -27,7 +28,20 @@ class _DashboardScreenState extends State<DashboardScreen> {
   int _index = 0;
   bool _navExpanded = true;
   bool _isExportingReport = false;
+  bool _isChatLoading = false;
+  ChatbotMode _chatbotMode = ChatbotMode.fallbackMode;
   final ReportExportService _reportExportService = ReportExportService();
+  final ChatbotService _chatbotService = ChatbotService();
+  final TextEditingController _chatController = TextEditingController();
+  final ScrollController _chatScrollController = ScrollController();
+  final List<_ChatMessage> _chatMessages = [
+    const _ChatMessage(
+      role: _ChatRole.assistant,
+      content:
+          'Hi, I am the ReVolve assistant. Ask me about login, dashboard sections, alerts, devices, analytics, or report export.',
+    ),
+  ];
+  List<String> _chatSuggestions = const [];
   String? _lastAlertNotificationKey;
 
   @override
@@ -35,6 +49,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       context.read<SensorProvider>().startSensorMonitoring();
+      _loadChatbotMode();
+    });
+  }
+
+  @override
+  void dispose() {
+    _chatController.dispose();
+    _chatScrollController.dispose();
+    _chatbotService.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadChatbotMode() async {
+    final mode = await _chatbotService.getMode();
+    if (!mounted) {
+      return;
+    }
+    setState(() {
+      _chatbotMode = mode;
     });
   }
 
@@ -57,6 +90,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
           _devicesPage(deviceProvider, sensor.latestData),
           _logsPage(sensor, logProvider),
           _analyticsPage(sensor),
+          _assistantPage(),
         ];
 
         return Scaffold(
@@ -116,19 +150,29 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ],
           ),
           body: isCompact
-              ? SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                  child: pages[_index],
-                )
-              : Row(
+              ? Stack(
                   children: [
-                    _buildSidebar(),
-                    Expanded(
-                      child: SingleChildScrollView(
-                        padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-                        child: pages[_index],
-                      ),
+                    SingleChildScrollView(
+                      padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+                      child: pages[_index],
                     ),
+                    _chatLauncherButton(),
+                  ],
+                )
+              : Stack(
+                  children: [
+                    Row(
+                      children: [
+                        _buildSidebar(),
+                        Expanded(
+                          child: SingleChildScrollView(
+                            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                            child: pages[_index],
+                          ),
+                        ),
+                      ],
+                    ),
+                    _chatLauncherButton(),
                   ],
                 ),
         );
@@ -342,6 +386,25 @@ class _DashboardScreenState extends State<DashboardScreen> {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _chatLauncherButton() {
+    return Positioned(
+      right: 20,
+      bottom: 20,
+      child: FloatingActionButton.extended(
+        heroTag: 'chatbot-launcher',
+        onPressed: () {
+          setState(() {
+            _index = 5;
+          });
+        },
+        icon: const Icon(Icons.smart_toy_rounded),
+        label: const Text('Chatbot'),
+        backgroundColor: const Color(0xFF1D4ED8),
+        foregroundColor: Colors.white,
       ),
     );
   }
@@ -884,6 +947,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                           style: const TextStyle(
                             fontSize: 22,
                             fontWeight: FontWeight.w800,
+                            color: Color(0xFF0F172A),
                           ),
                         ),
                       ],
@@ -895,6 +959,299 @@ class _DashboardScreenState extends State<DashboardScreen> {
         ),
       ],
     );
+  }
+
+  Widget _assistantPage() {
+    final theme = Theme.of(context);
+
+    return _panel(
+      title: 'App Chatbot Assistant',
+      subtitle:
+          'Ask questions about ReVolve features and workflow. This assistant is restricted to app usage guidance.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Align(
+            alignment: Alignment.centerRight,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: _chatbotMode == ChatbotMode.ollamaActive
+                    ? const Color(0xFFE8F7EE)
+                    : const Color(0xFFFFF4DB),
+                borderRadius: BorderRadius.circular(999),
+                border: Border.all(
+                  color: _chatbotMode == ChatbotMode.ollamaActive
+                      ? const Color(0xFF86EFAC)
+                      : const Color(0xFFFCD34D),
+                ),
+              ),
+              child: Text(
+                _chatbotMode == ChatbotMode.ollamaActive
+                    ? 'Ollama active'
+                    : 'Fallback mode',
+                style: TextStyle(
+                  color: _chatbotMode == ChatbotMode.ollamaActive
+                      ? const Color(0xFF166534)
+                      : const Color(0xFF92400E),
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: const Color(0xFFEFF6FF),
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: const Color(0xFFBFDBFE)),
+            ),
+            child: const Text(
+              'Try: How do I export reports? | What does the Alert Center show? | How do relay controls work?',
+              style: TextStyle(
+                color: Color(0xFF1E3A8A),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Container(
+            height: 420,
+            decoration: BoxDecoration(
+              color: const Color(0xFFF8FAFC),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: const Color(0xFFE2E8F0)),
+            ),
+            child: Stack(
+              children: [
+                ListView.builder(
+                  controller: _chatScrollController,
+                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 68),
+                  itemCount: _chatMessages.length,
+                  itemBuilder: (context, index) {
+                    final message = _chatMessages[index];
+                    final isUser = message.role == _ChatRole.user;
+
+                    return Align(
+                      alignment:
+                          isUser ? Alignment.centerRight : Alignment.centerLeft,
+                      child: Container(
+                        constraints: const BoxConstraints(maxWidth: 560),
+                        margin: const EdgeInsets.only(bottom: 10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
+                        decoration: BoxDecoration(
+                          color: isUser
+                              ? const Color(0xFF1D4ED8)
+                              : Colors.white,
+                          borderRadius: BorderRadius.circular(14),
+                          border: Border.all(
+                            color: isUser
+                                ? const Color(0xFF1D4ED8)
+                                : const Color(0xFFE2E8F0),
+                          ),
+                        ),
+                        child: Text(
+                          message.content,
+                          style: theme.textTheme.bodyMedium?.copyWith(
+                            color: isUser
+                                ? Colors.white
+                                : const Color(0xFF0F172A),
+                            height: 1.45,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                Positioned(
+                  left: 12,
+                  bottom: 12,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(999),
+                      border: Border.all(color: const Color(0xFFC7D2FE)),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x1F1D4ED8),
+                          blurRadius: 12,
+                          offset: Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        Icon(
+                          Icons.smart_toy_rounded,
+                          size: 18,
+                          color: Color(0xFF1D4ED8),
+                        ),
+                        SizedBox(width: 6),
+                        Text(
+                          'Chatbot',
+                          style: TextStyle(
+                            color: Color(0xFF1E3A8A),
+                            fontWeight: FontWeight.w700,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+          if (_chatSuggestions.isNotEmpty) ...[
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _chatSuggestions
+                  .map(
+                    (item) => ActionChip(
+                      label: Text(item),
+                      onPressed: () => _sendChatQuery(preset: item),
+                    ),
+                  )
+                  .toList(growable: false),
+            ),
+            const SizedBox(height: 12),
+          ],
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _chatController,
+                  minLines: 1,
+                  maxLines: 3,
+                  style: const TextStyle(
+                    color: Color(0xFF0F172A),
+                    fontWeight: FontWeight.w600,
+                  ),
+                  cursorColor: const Color(0xFF1D4ED8),
+                  textInputAction: TextInputAction.send,
+                  onSubmitted: (_) => _sendChatQuery(),
+                  decoration: InputDecoration(
+                    hintText: 'Ask about app usage...',
+                    hintStyle: const TextStyle(
+                      color: Color(0xFF94A3B8),
+                      fontWeight: FontWeight.w500,
+                    ),
+                    filled: true,
+                    fillColor: Colors.white,
+                    enabledBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                    ),
+                    focusedBorder: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      borderSide: const BorderSide(color: Color(0xFF1D4ED8), width: 1.4),
+                    ),
+                    contentPadding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 14,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              FilledButton.icon(
+                onPressed: _isChatLoading ? null : _sendChatQuery,
+                icon: _isChatLoading
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.send_rounded),
+                label: const Text('Send'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _sendChatQuery({String? preset}) async {
+    if (_isChatLoading) {
+      return;
+    }
+
+    final text = (preset ?? _chatController.text).trim();
+    if (text.isEmpty) {
+      return;
+    }
+
+    setState(() {
+      _chatMessages.add(_ChatMessage(role: _ChatRole.user, content: text));
+      _isChatLoading = true;
+      if (preset == null) {
+        _chatController.clear();
+      }
+    });
+    _scrollChatToBottom();
+
+    try {
+      final reply = await _chatbotService.ask(text);
+      if (!mounted) {
+        return;
+      }
+
+      setState(() {
+        _chatMessages.add(
+          _ChatMessage(role: _ChatRole.assistant, content: reply.answer),
+        );
+        _chatSuggestions = reply.suggestedQuestions;
+        _chatbotMode = reply.mode;
+      });
+    } catch (_) {
+      if (!mounted) {
+        return;
+      }
+      setState(() {
+        _chatMessages.add(
+          const _ChatMessage(
+            role: _ChatRole.assistant,
+            content:
+                'I could not reach the chatbot service. Please make sure backend is running and try again.',
+          ),
+        );
+      });
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isChatLoading = false;
+        });
+      }
+      _scrollChatToBottom();
+    }
+  }
+
+  void _scrollChatToBottom() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_chatScrollController.hasClients) {
+        return;
+      }
+      _chatScrollController.animateTo(
+        _chatScrollController.position.maxScrollExtent,
+        duration: const Duration(milliseconds: 220),
+        curve: Curves.easeOut,
+      );
+    });
   }
 
   Widget _buildPredictiveConsole(
@@ -1411,10 +1768,16 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             Text(
               log.title,
-              style: const TextStyle(fontWeight: FontWeight.w800),
+              style: const TextStyle(
+                fontWeight: FontWeight.w800,
+                color: Color(0xFF1E293B),
+              ),
             ),
             const SizedBox(height: 4),
-            Text(log.message),
+            Text(
+              log.message,
+              style: const TextStyle(color: Color(0xFF475569)),
+            ),
             const SizedBox(height: 6),
             Text(
               '${log.category} - ${DateFormat('dd MMM, HH:mm').format(log.timestamp)}',
@@ -1639,4 +2002,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return const Color(0xFF0F766E);
     }
   }
+}
+
+enum _ChatRole { user, assistant }
+
+class _ChatMessage {
+  const _ChatMessage({required this.role, required this.content});
+
+  final _ChatRole role;
+  final String content;
 }
