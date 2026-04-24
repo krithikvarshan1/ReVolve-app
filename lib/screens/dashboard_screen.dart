@@ -1,4 +1,4 @@
-﻿import 'package:fl_chart/fl_chart.dart';
+import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:intl/intl.dart';
@@ -154,7 +154,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   children: [
                     SingleChildScrollView(
                       padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
-                      child: pages[_index],
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [pages[_index]],
+                      ),
                     ),
                     _chatLauncherButton(),
                   ],
@@ -162,14 +166,31 @@ class _DashboardScreenState extends State<DashboardScreen> {
               : Stack(
                   children: [
                     Row(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         _buildSidebar(),
-                        Expanded(
-                          child: SingleChildScrollView(
-                            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
-                            child: pages[_index],
+                        // Assistant page: full-height fixed layout (no outer scroll)
+                        if (_index == 5)
+                          Expanded(child: _assistantPage())
+                        else
+                          Expanded(
+                            child: LayoutBuilder(
+                              builder: (context, constraints) =>
+                                  SingleChildScrollView(
+                                padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+                                child: ConstrainedBox(
+                                  constraints: BoxConstraints(
+                                    minHeight: constraints.maxHeight - 8 - 24,
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [pages[_index]],
+                                  ),
+                                ),
+                              ),
+                            ),
                           ),
-                        ),
                       ],
                     ),
                     _chatLauncherButton(),
@@ -391,6 +412,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
   }
 
   Widget _chatLauncherButton() {
+    // Hide the FAB when the chatbot page (index 5) is already open
+    if (_index == 5) return const SizedBox.shrink();
+
     return Positioned(
       right: 20,
       bottom: 20,
@@ -782,6 +806,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
         _panel(
           title: 'Connected Devices',
@@ -900,6 +925,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
       children: [
         _panel(
           title: 'Admin Analytics',
@@ -964,222 +990,247 @@ class _DashboardScreenState extends State<DashboardScreen> {
   Widget _assistantPage() {
     final theme = Theme.of(context);
 
-    return _panel(
-      title: 'App Chatbot Assistant',
-      subtitle:
-          'Ask questions about ReVolve features and workflow. This assistant is restricted to app usage guidance.',
+    return Container(
+      margin: const EdgeInsets.fromLTRB(20, 8, 20, 24),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Colors.white, Color(0xFFF8FAFC)],
+        ),
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: const Color(0xFFE2E8F0)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x0F0F172A),
+            blurRadius: 20,
+            offset: Offset(0, 10),
+          ),
+        ],
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Align(
-            alignment: Alignment.centerRight,
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              decoration: BoxDecoration(
-                color: _chatbotMode == ChatbotMode.ollamaActive
-                    ? const Color(0xFFE8F7EE)
-                    : const Color(0xFFFFF4DB),
-                borderRadius: BorderRadius.circular(999),
-                border: Border.all(
-                  color: _chatbotMode == ChatbotMode.ollamaActive
-                      ? const Color(0xFF86EFAC)
-                      : const Color(0xFFFCD34D),
-                ),
-              ),
-              child: Text(
-                _chatbotMode == ChatbotMode.ollamaActive
-                    ? 'Ollama active'
-                    : 'Fallback mode',
-                style: TextStyle(
-                  color: _chatbotMode == ChatbotMode.ollamaActive
-                      ? const Color(0xFF166534)
-                      : const Color(0xFF92400E),
-                  fontWeight: FontWeight.w700,
-                  fontSize: 12,
-                ),
-              ),
-            ),
-          ),
-          const SizedBox(height: 12),
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: const Color(0xFFEFF6FF),
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: const Color(0xFFBFDBFE)),
-            ),
-            child: const Text(
-              'Try: How do I export reports? | What does the Alert Center show? | How do relay controls work?',
-              style: TextStyle(
-                color: Color(0xFF1E3A8A),
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
-          const SizedBox(height: 14),
-          Container(
-            height: 420,
-            decoration: BoxDecoration(
-              color: const Color(0xFFF8FAFC),
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: const Color(0xFFE2E8F0)),
-            ),
-            child: Stack(
+          // ── Fixed header ────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                ListView.builder(
-                  controller: _chatScrollController,
-                  padding: const EdgeInsets.fromLTRB(12, 12, 12, 68),
-                  itemCount: _chatMessages.length,
-                  itemBuilder: (context, index) {
-                    final message = _chatMessages[index];
-                    final isUser = message.role == _ChatRole.user;
-
-                    return Align(
-                      alignment:
-                          isUser ? Alignment.centerRight : Alignment.centerLeft,
-                      child: Container(
-                        constraints: const BoxConstraints(maxWidth: 560),
-                        margin: const EdgeInsets.only(bottom: 10),
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 10,
-                        ),
-                        decoration: BoxDecoration(
-                          color: isUser
-                              ? const Color(0xFF1D4ED8)
-                              : Colors.white,
-                          borderRadius: BorderRadius.circular(14),
-                          border: Border.all(
-                            color: isUser
-                                ? const Color(0xFF1D4ED8)
-                                : const Color(0xFFE2E8F0),
+                // Title + status badge row
+                Row(
+                  children: [
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text(
+                            'App Chatbot Assistant',
+                            style: TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w800,
+                              color: Color(0xFF0F172A),
+                              letterSpacing: -0.3,
+                            ),
                           ),
-                        ),
-                        child: Text(
-                          message.content,
-                          style: theme.textTheme.bodyMedium?.copyWith(
-                            color: isUser
-                                ? Colors.white
-                                : const Color(0xFF0F172A),
-                            height: 1.45,
-                            fontWeight: FontWeight.w600,
+                          SizedBox(height: 4),
+                          Text(
+                            'Ask questions about ReVolve features and workflow. This assistant is restricted to app usage guidance.',
+                            style: TextStyle(
+                              color: Color(0xFF64748B),
+                              height: 1.45,
+                            ),
                           ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: _chatbotMode == ChatbotMode.ollamaActive
+                            ? const Color(0xFFE8F7EE)
+                            : const Color(0xFFFFF4DB),
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: _chatbotMode == ChatbotMode.ollamaActive
+                              ? const Color(0xFF86EFAC)
+                              : const Color(0xFFFCD34D),
                         ),
                       ),
-                    );
-                  },
+                      child: Text(
+                        _chatbotMode == ChatbotMode.ollamaActive
+                            ? 'Ollama active'
+                            : 'Fallback mode',
+                        style: TextStyle(
+                          color: _chatbotMode == ChatbotMode.ollamaActive
+                              ? const Color(0xFF166534)
+                              : const Color(0xFF92400E),
+                          fontWeight: FontWeight.w700,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                Positioned(
-                  left: 12,
-                  bottom: 12,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 10,
-                      vertical: 8,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(999),
-                      border: Border.all(color: const Color(0xFFC7D2FE)),
-                      boxShadow: const [
-                        BoxShadow(
-                          color: Color(0x1F1D4ED8),
-                          blurRadius: 12,
-                          offset: Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: const [
-                        Icon(
-                          Icons.smart_toy_rounded,
-                          size: 18,
-                          color: Color(0xFF1D4ED8),
-                        ),
-                        SizedBox(width: 6),
-                        Text(
-                          'Chatbot',
-                          style: TextStyle(
-                            color: Color(0xFF1E3A8A),
-                            fontWeight: FontWeight.w700,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
+                const SizedBox(height: 12),
+                // Hint banner
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEFF6FF),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: const Color(0xFFBFDBFE)),
+                  ),
+                  child: const Text(
+                    'Try: How do I export reports? | What does the Alert Center show? | How do relay controls work?',
+                    style: TextStyle(
+                      color: Color(0xFF1E3A8A),
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ),
+                const SizedBox(height: 14),
               ],
             ),
           ),
-          const SizedBox(height: 12),
-          if (_chatSuggestions.isNotEmpty) ...[
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: _chatSuggestions
-                  .map(
-                    (item) => ActionChip(
-                      label: Text(item),
-                      onPressed: () => _sendChatQuery(preset: item),
-                    ),
-                  )
-                  .toList(growable: false),
+
+          // ── Scrollable chat messages ─────────────────────────────────────
+          Expanded(
+            child: Container(
+              margin: const EdgeInsets.symmetric(horizontal: 20),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8FAFC),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFE2E8F0)),
+              ),
+              child: Stack(
+                children: [
+                  ListView.builder(
+                    controller: _chatScrollController,
+                    padding: const EdgeInsets.fromLTRB(12, 12, 12, 12),
+                    itemCount: _chatMessages.length,
+                    itemBuilder: (context, index) {
+                      final message = _chatMessages[index];
+                      final isUser = message.role == _ChatRole.user;
+
+                      return Align(
+                        alignment:
+                            isUser ? Alignment.centerRight : Alignment.centerLeft,
+                        child: Container(
+                          constraints: const BoxConstraints(maxWidth: 560),
+                          margin: const EdgeInsets.only(bottom: 10),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 10,
+                          ),
+                          decoration: BoxDecoration(
+                            color: isUser
+                                ? const Color(0xFF1D4ED8)
+                                : Colors.white,
+                            borderRadius: BorderRadius.circular(14),
+                            border: Border.all(
+                              color: isUser
+                                  ? const Color(0xFF1D4ED8)
+                                  : const Color(0xFFE2E8F0),
+                            ),
+                          ),
+                          child: Text(
+                            message.content,
+                            style: theme.textTheme.bodyMedium?.copyWith(
+                              color: isUser
+                                  ? Colors.white
+                                  : const Color(0xFF0F172A),
+                              height: 1.45,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                 ],
+
+              ),
             ),
-            const SizedBox(height: 12),
-          ],
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _chatController,
-                  minLines: 1,
-                  maxLines: 3,
-                  style: const TextStyle(
-                    color: Color(0xFF0F172A),
-                    fontWeight: FontWeight.w600,
+          ),
+
+          // ── Fixed bottom: suggestions + text input ───────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_chatSuggestions.isNotEmpty) ...[
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _chatSuggestions
+                        .map(
+                          (item) => ActionChip(
+                            label: Text(item),
+                            onPressed: () => _sendChatQuery(preset: item),
+                          ),
+                        )
+                        .toList(growable: false),
                   ),
-                  cursorColor: const Color(0xFF1D4ED8),
-                  textInputAction: TextInputAction.send,
-                  onSubmitted: (_) => _sendChatQuery(),
-                  decoration: InputDecoration(
-                    hintText: 'Ask about app usage...',
-                    hintStyle: const TextStyle(
-                      color: Color(0xFF94A3B8),
-                      fontWeight: FontWeight.w500,
+                  const SizedBox(height: 10),
+                ],
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextField(
+                        controller: _chatController,
+                        minLines: 1,
+                        maxLines: 3,
+                        style: const TextStyle(
+                          color: Color(0xFF0F172A),
+                          fontWeight: FontWeight.w600,
+                        ),
+                        cursorColor: const Color(0xFF1D4ED8),
+                        textInputAction: TextInputAction.send,
+                        onSubmitted: (_) => _sendChatQuery(),
+                        decoration: InputDecoration(
+                          hintText: 'Ask about app usage...',
+                          hintStyle: const TextStyle(
+                            color: Color(0xFF94A3B8),
+                            fontWeight: FontWeight.w500,
+                          ),
+                          filled: true,
+                          fillColor: Colors.white,
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(16),
+                            borderSide: const BorderSide(
+                                color: Color(0xFF1D4ED8), width: 1.4),
+                          ),
+                          contentPadding: const EdgeInsets.symmetric(
+                            horizontal: 14,
+                            vertical: 14,
+                          ),
+                        ),
+                      ),
                     ),
-                    filled: true,
-                    fillColor: Colors.white,
-                    enabledBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(color: Color(0xFFCBD5E1)),
+                    const SizedBox(width: 10),
+                    FilledButton.icon(
+                      onPressed: _isChatLoading ? null : _sendChatQuery,
+                      icon: _isChatLoading
+                          ? const SizedBox(
+                              width: 14,
+                              height: 14,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.send_rounded),
+                      label: const Text('Send'),
                     ),
-                    focusedBorder: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      borderSide: const BorderSide(color: Color(0xFF1D4ED8), width: 1.4),
-                    ),
-                    contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 14,
-                    ),
-                  ),
+                  ],
                 ),
-              ),
-              const SizedBox(width: 10),
-              FilledButton.icon(
-                onPressed: _isChatLoading ? null : _sendChatQuery,
-                icon: _isChatLoading
-                    ? const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : const Icon(Icons.send_rounded),
-                label: const Text('Send'),
-              ),
-            ],
+              ],
+            ),
           ),
         ],
       ),
