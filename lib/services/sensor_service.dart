@@ -28,9 +28,9 @@ class SensorService {
 
   // Start simulating sensor data
   void startSensorSimulation() {
-    if (_timer != null) {
-      return;
-    }
+    // Cancel any existing timer so we always get a fresh start (needed when
+    // switching between manual and auto modes).
+    _timer?.cancel();
     _timer = Timer.periodic(AppConfig.sensorUpdateInterval, (_) {
       final sensorData = _generateMockSensorData();
       _sensorStreamController.add(sensorData);

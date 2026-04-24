@@ -188,6 +188,19 @@ class SensorProvider with ChangeNotifier {
 
   void setManualSimulationEnabled(bool enabled) {
     _sensorService.setManualSimulationEnabled(enabled);
+    if (enabled) {
+      // Ensure the simulation timer is running so manual slider values
+      // are emitted immediately, regardless of Firebase data freshness.
+      _sensorService.startSensorSimulation();
+      _isFallbackSimulationActive = true;
+    } else {
+      // When disabling manual mode, stop the forced timer and let the
+      // normal monitoring logic decide whether to resume auto-simulation.
+      _sensorService.stopSensorSimulation();
+      _isFallbackSimulationActive = false;
+      // Restart monitoring so live/fallback data resumes correctly.
+      startSensorMonitoring();
+    }
     notifyListeners();
   }
 

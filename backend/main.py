@@ -258,7 +258,14 @@ def _load_pickle(path: Path) -> Any:
 
 
 def _load_lstm_model(path: Path) -> Any:
-    checkpoint = torch.load(path, map_location=torch.device("cpu"))
+    try:
+        # weights_only=False is required for checkpoints that contain
+        # non-tensor objects (e.g. full nn.Module or dict with metadata).
+        # PyTorch >= 2.6 changed the default to True which breaks these files.
+        checkpoint = torch.load(path, map_location=torch.device("cpu"), weights_only=False)
+    except Exception:
+        # Fallback for very old torch versions that don't accept weights_only.
+        checkpoint = torch.load(path, map_location=torch.device("cpu"))  # type: ignore[call-overload]
     if hasattr(checkpoint, "eval"):
         checkpoint.eval()
     return checkpoint
@@ -625,7 +632,26 @@ def load_models() -> ModelRegistry:
     )
 
 
-app = FastAPI(title="ReVolve Predictive Maintenance API", version="1.0.0")
+from contextlib import asynccontextmanager
+
+
+@asynccontextmanager
+async def _lifespan(application: FastAPI):
+    global MODEL_REGISTRY
+    try:
+        MODEL_REGISTRY = load_models()
+        LOGGER.info("ML models loaded successfully from %s", MODEL_DIR)
+    except Exception as exc:
+        MODEL_REGISTRY = None
+        LOGGER.warning("Failed to load ML models from %s: %s", MODEL_DIR, exc)
+    yield
+
+
+app = FastAPI(
+    title="ReVolve Predictive Maintenance API",
+    version="1.0.0",
+    lifespan=_lifespan,
+)
 
 app.add_middleware(
     CORSMiddleware,
@@ -646,27 +672,52 @@ app.add_middleware(
 )
 
 
-@app.on_event("startup")
-def startup_event() -> None:
-    global MODEL_REGISTRY
-    try:
-        MODEL_REGISTRY = load_models()
-    except Exception as exc:
-        MODEL_REGISTRY = None
-        LOGGER.warning("Failed to load ML models from %s: %s", MODEL_DIR, exc)
-
 
 @app.get("/health")
-def health() -> dict[str, str]:
+def health() -> dict[str, Any]:
     ollama_ready = _is_ollama_available()
+    model_detail: dict[str, str] = {}
+    if MODEL_REGISTRY is None:
+        model_detail["status"] = "missing"
+    else:
+        model_detail["status"] = "loaded"
+        model_detail["fault_model"] = type(MODEL_REGISTRY.fault_model).__name__
+        model_detail["rul_model"] = type(MODEL_REGISTRY.rul_model).__name__
+        model_detail["anomaly_model"] = type(MODEL_REGISTRY.anomaly_model).__name__
+        model_detail["lstm_model"] = type(MODEL_REGISTRY.lstm_model).__name__
     return {
         "status": "ok",
-        "models": "loaded" if MODEL_REGISTRY else "missing",
+        "models": model_detail,
         "chat_api": "ollama-active" if ollama_ready else "fallback-mode",
         "chat_model": OLLAMA_MODEL,
         "chat_provider": "ollama",
     }
 
+
+@app.get("/debug-models")
+def debug_models() -> dict[str, Any]:
+    """Diagnostic endpoint – shows which models loaded and any errors."""
+    results: dict[str, Any] = {"model_dir": str(MODEL_DIR), "files": []}
+    for f in MODEL_DIR.iterdir():
+        results["files"].append(f.name)
+
+    load_errors: dict[str, str] = {}
+    for name, loader in [
+        ("motor_fault_gpu_model.pkl", lambda p: _load_pickle(p)),
+        ("rul_proxy_model.pkl", lambda p: _load_pickle(p)),
+        ("improved_anomaly_model.pkl", lambda p: _load_pickle(p)),
+        ("label_encoder.pkl", lambda p: _load_pickle(p)),
+        ("lstm_forecast_model.pth", lambda p: _load_lstm_model(p)),
+    ]:
+        try:
+            loader(MODEL_DIR / name)  # type: ignore[operator]
+            load_errors[name] = "ok"
+        except Exception as exc:
+            load_errors[name] = str(exc)
+
+    results["load_results"] = load_errors
+    results["registry_loaded"] = MODEL_REGISTRY is not None
+    return results
 
 @app.get("/")
 def root() -> dict[str, str]:

@@ -6,3 +6,4 @@ scikit-learn>=1.5.0
 joblib>=1.4.0
 torch>=2.2.0
 python-multipart>=0.0.9
+xgboost>=2.0.0
