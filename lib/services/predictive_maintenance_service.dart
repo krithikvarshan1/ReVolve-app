@@ -29,11 +29,16 @@ class PredictiveMaintenanceService {
       'deviceId': sensorData.deviceId,
     };
 
-    final response = await _client.post(
-      uri,
-      headers: {'Content-Type': 'application/json'},
-      body: json.encode(payload),
-    );
+    final response = await _client
+        .post(
+          uri,
+          headers: {'Content-Type': 'application/json'},
+          body: json.encode(payload),
+        )
+        .timeout(
+          const Duration(seconds: 25),
+          onTimeout: () => throw Exception('Backend request timed out after 25s'),
+        );
 
     if (response.statusCode < 200 || response.statusCode >= 300) {
       throw Exception('Predictive API failed: ${response.statusCode}');

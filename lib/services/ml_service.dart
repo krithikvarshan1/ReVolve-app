@@ -19,16 +19,16 @@ class MLService {
     // Calculate health score using weighted formula
     final healthScore = latestData.healthScore / 100.0; // 0-1
 
-    // Simulate failure probability (inverse of health score with some randomness)
-    final failureProbability = (1.0 - healthScore) + (_random.nextDouble() * 0.2 - 0.1);
-    final clampedFailureProb = failureProbability.clamp(0.0, 1.0);
+    // Deterministic failure probability — inverse of health score with no
+    // random noise so the Failure Risk KPI stays stable on fixed inputs.
+    final failureProbability = (1.0 - healthScore).clamp(0.0, 1.0);
 
     // Simulate RUL based on health score and degradation trend
     final degradationRate = _calculateDegradationRate(sensorHistory);
     final remainingUsefulLife = _calculateRUL(healthScore, degradationRate);
 
     // Generate AI insights
-    final insights = _generateInsights(latestData, clampedFailureProb, remainingUsefulLife);
+    final insights = _generateInsights(latestData, failureProbability, remainingUsefulLife);
 
     // Calculate degradation trend for each sensor
     final degradationTrend = _calculateDegradationTrends(sensorHistory);
@@ -36,7 +36,7 @@ class MLService {
     return MLPrediction(
       id: _uuid.v4(),
       remainingUsefulLife: remainingUsefulLife,
-      failureProbability: clampedFailureProb,
+      failureProbability: failureProbability,
       insights: insights,
       degradationTrend: degradationTrend,
       timestamp: DateTime.now(),
@@ -72,15 +72,12 @@ class MLService {
   }
 
   double _calculateRUL(double healthScore, double degradationRate) {
-    // Simple RUL calculation: assume 100% health = 2000 hours, degrade linearly
+    // Stable, deterministic formula: health score maps linearly to remaining
+    // life hours. 100% health = 2000 h; 0% = 0 h.
+    // The old slope-regression approach divided by a near-zero value, producing
+    // wildly different results (51 h → 27 h → 32 h) for identical fixed inputs.
     const maxLifeHours = 2000.0;
-    final currentLifeRatio = healthScore;
-    final degradationPerHour = degradationRate / 24.0; // Assuming daily measurements
-
-    if (degradationPerHour <= 0) return maxLifeHours;
-
-    final remainingHours = currentLifeRatio / degradationPerHour;
-    return remainingHours.clamp(0.0, maxLifeHours);
+    return (healthScore * maxLifeHours).clamp(0.0, maxLifeHours);
   }
 
   List<String> _generateInsights(SensorData data, double failureProb, double rul) {

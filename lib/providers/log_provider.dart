@@ -17,22 +17,30 @@ class LogProvider with ChangeNotifier {
   }
 
   void _loadLogs() {
+    // Show mock logs immediately so the UI is never blank.
+    _logs = _mockLogs();
     _isLoading = true;
     notifyListeners();
 
+    if (!_firebaseService.isAvailable) {
+      _isLoading = false;
+      notifyListeners();
+      return;
+    }
+
     const deviceId = 'device-001';
-    final stream = _firebaseService.getLogsStream(deviceId);
-    stream.listen((items) {
-      _logs = items.isEmpty ? _mockLogs() : items;
+    _firebaseService.getLogsStream(deviceId).listen((items) {
+      // Only replace mock logs if Firebase actually returned real entries.
+      if (items.isNotEmpty) {
+        _logs = items;
+      }
+      _isLoading = false;
+      notifyListeners();
+    }, onError: (_) {
+      // Firebase error — keep the mock logs, just stop the spinner.
       _isLoading = false;
       notifyListeners();
     });
-
-    if (!_firebaseService.isAvailable) {
-      _logs = _mockLogs();
-      _isLoading = false;
-      notifyListeners();
-    }
   }
 
   List<ActivityLog> get maintenanceLogs => _logs

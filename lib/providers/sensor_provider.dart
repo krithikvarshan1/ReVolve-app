@@ -10,6 +10,7 @@ import '../services/device_control_service.dart';
 import '../models/ml_prediction.dart';
 import '../models/predictive_maintenance_result.dart';
 import '../services/predictive_maintenance_service.dart';
+import '../config/app_config.dart';
 
 const Duration _cloudDataFreshnessWindow = Duration(seconds: 12);
 
@@ -31,6 +32,8 @@ class SensorProvider with ChangeNotifier {
   String? _predictiveError;
   bool _isFallbackSimulationActive = false;
   final Map<String, DateTime> _lastAlertAt = {};
+  // Throttle: only hit the backend once per mlPredictionInterval (default 30s).
+  DateTime? _lastPredictiveCallAt;
 
   List<SensorData> get sensorHistory => _sensorHistory;
   SensorData? get latestData => _latestData;
@@ -63,9 +66,19 @@ class SensorProvider with ChangeNotifier {
       // Save to Firebase
       _firebaseService.saveSensorData(data);
 
-      // Update ML prediction
+      // Update ML prediction (local, every tick)
       _updatePrediction();
-      unawaited(_updatePredictiveResult(data));
+
+      // Hit the backend at most once per mlPredictionInterval to avoid
+      // flooding the server with 1,500+ concurrent hanging requests.
+      final now = DateTime.now();
+      final sinceLastCall = _lastPredictiveCallAt == null
+          ? AppConfig.mlPredictionInterval
+          : now.difference(_lastPredictiveCallAt!);
+      if (sinceLastCall >= AppConfig.mlPredictionInterval) {
+        _lastPredictiveCallAt = now;
+        unawaited(_updatePredictiveResult(data));
+      }
       _handleSafetyAutomation(data);
 
       notifyListeners();
@@ -147,16 +160,34 @@ class SensorProvider with ChangeNotifier {
     try {
       _latestPredictiveResult = await _predictiveService.fetchPrediction(data);
       _predictiveError = null;
-    } catch (e) {
-      if (_latestPrediction == null) {
-        _latestPrediction = _mlService.predictLifecycle(_sensorHistory);
+    } catch (_) {
+      // Backend unavailable or timed out — use local ML prediction as fallback.
+      try {
+        _latestPrediction ??= _mlService.predictLifecycle(_sensorHistory);
+        _latestPredictiveResult = PredictiveMaintenanceResult.fromLocalPrediction(
+          sensorData: data,
+          prediction: _latestPrediction!,
+        );
+        _predictiveError = 'Backend unavailable — using local prediction.';
+      } catch (_) {
+        // Last-resort: build a minimal result directly from sensor data so the
+        // Predictive Console never stays blank.
+        final healthPct = data.healthScore.clamp(0.0, 100.0);
+        _latestPredictiveResult = PredictiveMaintenanceResult(
+          faultPrediction: healthPct > 70 ? 'NORMAL' : healthPct > 40 ? 'OVERLOAD' : 'FAILURE_IMMINENT',
+          faultConfidence: (100 - healthPct).clamp(0.0, 100.0),
+          remainingUsefulLife: (healthPct * 20).round(),
+          anomalyStatus: data.gas > 500 || data.vibration > 5 ? 'ANOMALY' : 'NORMAL',
+          futureForecastTemp: data.temperature,
+          maintenanceRecommendation: healthPct > 70 ? 'No Action Needed' : 'Schedule Inspection',
+          healthScore: healthPct.round(),
+          riskLevel: healthPct > 70 ? 'LOW' : healthPct > 40 ? 'MEDIUM' : 'HIGH',
+          forecastSeries: List.generate(12, (i) => data.temperature + i * 0.2, growable: false),
+          timestamp: DateTime.now(),
+          deviceId: data.deviceId,
+        );
+        _predictiveError = 'Using sensor-derived estimates.';
       }
-      _latestPredictiveResult = PredictiveMaintenanceResult.fromLocalPrediction(
-        sensorData: data,
-        prediction: _latestPrediction!,
-      );
-      _predictiveError =
-          'Using fallback local prediction. Backend unavailable or failed.';
     }
 
     if (_latestPredictiveResult != null) {
@@ -293,7 +324,9 @@ class SensorProvider with ChangeNotifier {
       data.gas,
     );
 
-    if (shouldShutdown) {
+    // Only write to Firebase when we have a real device ID — in simulation
+    // mode deviceId is empty and Firestore throws an invalid-path error.
+    if (shouldShutdown && data.deviceId.isNotEmpty) {
       await _firebaseService.updateDeviceRelay(data.deviceId, false);
       await _firebaseService.logUsage(
         data.deviceId,
@@ -372,7 +405,8 @@ class SensorProvider with ChangeNotifier {
       );
 
       await _firebaseService.saveAlert(alert);
-      await _firebaseService.logUsage(
+      if (data.deviceId.isNotEmpty) {
+        await _firebaseService.logUsage(
         data.deviceId,
         'alert_generated',
         {
@@ -381,6 +415,7 @@ class SensorProvider with ChangeNotifier {
           'title': alert.title,
         },
       );
+      } // end deviceId guard
     }
   }
 

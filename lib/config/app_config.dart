@@ -48,5 +48,5 @@ class AppConfig {
 
   // Update intervals
   static const Duration sensorUpdateInterval = Duration(seconds: 2);
-  static const Duration mlPredictionInterval = Duration(seconds: 10);
+  static const Duration mlPredictionInterval = Duration(seconds: 30);
 }

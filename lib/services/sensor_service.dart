@@ -83,9 +83,9 @@ class SensorService {
     required double jitter,
   }) {
     if (_manualSimulationEnabled) {
-      final base = _manualValues[key] ?? min;
-      final noisy = base + (_random.nextDouble() * 2 - 1) * jitter;
-      return noisy.clamp(min, max);
+      // Return exact slider value — no jitter — so the dashboard shows
+      // precisely what the user set on the simulation panel.
+      return (_manualValues[key] ?? min).clamp(min, max);
     }
 
     final value = min + _random.nextDouble() * (max - min);
