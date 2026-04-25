@@ -461,19 +461,26 @@ def _predict_fault(features: np.ndarray, models: ModelRegistry) -> tuple[str, fl
     return str(decoded).upper(), round(confidence, 2)
 
 
-def _predict_rul(features: np.ndarray, models: ModelRegistry) -> int:
+def _predict_rul(features: np.ndarray, sensor: SensorInput, models: ModelRegistry) -> int:
     model_features = _align_features_for_model(features, models.rul_model)
     raw_value = float(models.rul_model.predict(model_features)[0])
-    return _normalize_rul_to_hours(raw_value)
-
-
-def _normalize_rul_to_hours(raw_value: float) -> int:
-    # Some training setups emit normalized RUL in [0, 1]. Convert to hours.
+    
     if 0.0 <= raw_value <= 1.5:
-        value = raw_value * 2000.0
+        base_rul = raw_value * 1500.0
     else:
-        value = raw_value
-    return max(0, int(round(value)))
+        base_rul = raw_value
+
+    temp_penalty = max(0.0, sensor.temperature - 50.0) * 2.0
+    vib_penalty = max(0.0, sensor.vibration - 3.0) * 10.0
+    curr_penalty = max(0.0, sensor.current - 5.0) * 5.0
+    
+    degradation = temp_penalty + vib_penalty + curr_penalty
+    adjusted_rul = base_rul - degradation
+    final_rul = max(1, int(round(adjusted_rul)))
+    
+    LOGGER.info(f"Validation Log - raw_rul: {raw_value:.4f}, adjusted_rul: {adjusted_rul:.4f}")
+    
+    return final_rul
 
 
 def _predict_anomaly(features: np.ndarray, models: ModelRegistry) -> str:
@@ -543,67 +550,43 @@ def _derive_recommendation(fault: str, anomaly: str, risk: str) -> str:
 def _fault_severity_weight(fault: str) -> int:
     return {
         "NORMAL": 0,
-        "DUST_FAULT": 10,
-        "OVERHEAT": 20,
-        "OVERLOAD": 25,
-        "VIBRATION_FAULT": 25,
-        "BEARING_WEAR": 30,
-        "FAILURE_IMMINENT": 40,
+        "DUST_FAULT": 5,
+        "OVERHEAT": 15,
+        "OVERLOAD": 20,
+        "VIBRATION_FAULT": 20,
+        "BEARING_WEAR": 25,
+        "FAILURE_IMMINENT": 35,
     }.get(fault, 15)
 
 
 def _calculate_health_and_risk(
+    sensor: SensorInput,
     fault: str,
     fault_confidence: float,
     rul: int,
     anomaly: str,
 ) -> tuple[int, str]:
     severity = _fault_severity_weight(fault)
-    score = 100
-
-    # Weighted confidence penalty makes severe faults degrade health faster.
-    confidence_penalty = int(round((fault_confidence / 100.0) * severity * 0.9))
-    score -= confidence_penalty
-
-    if anomaly == "ANOMALY":
-        score -= 20
-
-    if rul < 50:
-        score -= 30
-    elif rul < 150:
-        score -= 18
-    elif rul < 300:
-        score -= 8
-
-    # Base severity deduction independent of confidence.
-    score -= int(round(severity * 0.5))
-    score = max(0, min(100, score))
-
-    risk_score = 0.0
-    risk_score += severity
-    risk_score += fault_confidence * 0.15
-
-    if anomaly == "ANOMALY":
-        risk_score += 20
-
-    if score < 30:
-        risk_score += 30
-    elif score < 50:
-        risk_score += 20
-    elif score < 70:
-        risk_score += 10
-
-    if rul < 10:
-        risk_score += 40
-    elif rul < 50:
-        risk_score += 30
-    elif rul < 100:
-        risk_score += 20
-    elif rul < 300:
-        risk_score += 10
-
-    risk_score = max(0.0, risk_score)
-
+    
+    # Continuous health score calculation
+    health = 100.0
+    temp_penalty = max(0.0, sensor.temperature - 40.0) * 0.5
+    vib_penalty = max(0.0, sensor.vibration - 2.0) * 2.0
+    curr_penalty = max(0.0, sensor.current - 4.0) * 1.5
+    anomaly_penalty = 15.0 if anomaly == "ANOMALY" else 0.0
+    fault_penalty = severity * (fault_confidence / 100.0)
+    
+    health -= (temp_penalty + vib_penalty + curr_penalty + anomaly_penalty + fault_penalty)
+    health_score = max(0, min(100, int(round(health))))
+    
+    # Continuous risk calculation
+    rul_factor = max(0.0, 1500.0 - rul) / 1500.0 * 40.0
+    health_factor = (100.0 - health_score) * 0.4
+    anomaly_factor = 20.0 if anomaly == "ANOMALY" else 0.0
+    fault_factor = severity * (fault_confidence / 100.0)
+    
+    risk_score = rul_factor + health_factor + anomaly_factor + fault_factor
+    
     if risk_score <= 30:
         risk = "LOW"
     elif risk_score <= 60:
@@ -612,8 +595,10 @@ def _calculate_health_and_risk(
         risk = "HIGH"
     else:
         risk = "CRITICAL"
+        
+    LOGGER.info(f"Validation Log - health_score: {health_score}, risk_score: {risk_score:.4f}")
 
-    return score, risk
+    return health_score, risk
 
 
 def load_models() -> ModelRegistry:
@@ -763,7 +748,7 @@ def predict(payload: SensorInput) -> PredictiveResponse:
 
     try:
         fault_prediction, fault_confidence = _predict_fault(features, MODEL_REGISTRY)
-        rul = _predict_rul(features, MODEL_REGISTRY)
+        rul = _predict_rul(features, payload, MODEL_REGISTRY)
         anomaly = _predict_anomaly(features, MODEL_REGISTRY)
         future_temp, forecast_series = _predict_forecast(payload, MODEL_REGISTRY)
 
@@ -782,6 +767,7 @@ def predict(payload: SensorInput) -> PredictiveResponse:
             anomaly = "NORMAL"
 
         health_score, risk_level = _calculate_health_and_risk(
+            payload,
             fault_prediction,
             fault_confidence,
             rul,

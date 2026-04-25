@@ -442,6 +442,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
     final latest = sensor.latestData;
     final prediction = sensor.latestPrediction;
     final predictive = sensor.latestPredictiveResult;
+    final displayHealthScore = predictive?.healthScore.toDouble() ?? sensor.healthScore;
     final wide = MediaQuery.of(context).size.width > 900;
 
     return Column(
@@ -512,7 +513,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   spacing: 12,
                   runSpacing: 12,
                   children: [
-                    _heroMetric('Health', '${sensor.healthScore.toStringAsFixed(0)}%'),
+                    _heroMetric('Health', '${displayHealthScore.toStringAsFixed(0)}%'),
                     _heroMetric(
                       'RUL',
                       predictive == null && prediction == null
@@ -540,9 +541,9 @@ class _DashboardScreenState extends State<DashboardScreen> {
           children: [
             _kpi(
               'Health Score',
-              '${sensor.healthScore.toStringAsFixed(1)}%',
+              '${displayHealthScore.toStringAsFixed(1)}%',
               Icons.favorite_rounded,
-              _healthColor(sensor.healthScore),
+              _healthColor(displayHealthScore),
             ),
             _kpi(
               'Failure Risk',
@@ -674,7 +675,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                 latest == null ? '--' : '${latest.current.toStringAsFixed(2)} A',
               ),
               _valueTile(
-                'Gas / Dust',
+                'Gas',
                 latest == null ? '--' : '${latest.gas.toStringAsFixed(0)} ppm',
               ),
               _valueTile(
@@ -1670,7 +1671,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
               ],
               const SizedBox(height: 16),
             ],
-            child,
+            Theme(
+              data: Theme.of(context).copyWith(
+                textTheme: Theme.of(context).textTheme.apply(
+                  bodyColor: const Color(0xFF68788E),
+                  displayColor: const Color(0xFF68788E),
+                ),
+                iconTheme: const IconThemeData(color: Color(0xFF68788E)),
+              ),
+              child: DefaultTextStyle(
+                style: const TextStyle(color: Color(0xFF68788E)),
+                child: child,
+              ),
+            ),
           ],
         ),
       );
@@ -1904,6 +1917,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                   sideTitles: SideTitles(showTitles: false),
                 ),
                 bottomTitles: AxisTitles(
+                  axisNameSize: 30,
                   axisNameWidget: const Padding(
                     padding: EdgeInsets.only(top: 8),
                     child: Text(
@@ -1911,7 +1925,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF64748B),
+                        color: Color(0xFFA9B2BF),
                       ),
                     ),
                   ),
@@ -1923,12 +1937,13 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       value.toInt().toString(),
                       style: const TextStyle(
                         fontSize: 10,
-                        color: Color(0xFF475569),
+                        color: Color(0xFFA9B2BF),
                       ),
                     ),
                   ),
                 ),
                 leftTitles: AxisTitles(
+                  axisNameSize: 30,
                   axisNameWidget: const Padding(
                     padding: EdgeInsets.only(bottom: 6),
                     child: Text(
@@ -1936,7 +1951,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF64748B),
+                        color: Color(0xFFA9B2BF),
                       ),
                     ),
                   ),
@@ -1947,7 +1962,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
                       value.toInt().toString(),
                       style: const TextStyle(
                         fontSize: 11,
-                        color: Color(0xFF475569),
+                        color: Color(0xFFA9B2BF),
                       ),
                     ),
                   ),

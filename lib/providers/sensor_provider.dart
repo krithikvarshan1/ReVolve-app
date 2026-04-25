@@ -107,35 +107,37 @@ class SensorProvider with ChangeNotifier {
       // Load last 50 readings from Firebase
       final stream = _firebaseService.getSensorDataStream(_sensorService.deviceId);
       stream.listen((data) {
+        if (_sensorService.manualSimulationEnabled) {
+          // Ignore database updates when manual simulation is active
+          // to prevent UI values fluctuating between real DB values and simulated values.
+          _isLoading = false;
+          return;
+        }
+
         if (data.isNotEmpty) {
           final cloudLatest = data.last;
           _latestData = cloudLatest;
 
-          if (_sensorService.manualSimulationEnabled) {
-            // Keep the existing behavior for manual simulation mode.
-            _sensorHistory = data;
-          } else {
-            // Live Firebase mode: append newest reading so trend chart grows over time.
-            final hasNewPoint = _sensorHistory.isEmpty ||
-                _sensorHistory.last.timestamp != cloudLatest.timestamp ||
-                _sensorHistory.last.temperature != cloudLatest.temperature ||
-                _sensorHistory.last.vibration != cloudLatest.vibration ||
-                _sensorHistory.last.current != cloudLatest.current;
+          // Live Firebase mode: append newest reading so trend chart grows over time.
+          final hasNewPoint = _sensorHistory.isEmpty ||
+              _sensorHistory.last.timestamp != cloudLatest.timestamp ||
+              _sensorHistory.last.temperature != cloudLatest.temperature ||
+              _sensorHistory.last.vibration != cloudLatest.vibration ||
+              _sensorHistory.last.current != cloudLatest.current;
 
-            if (hasNewPoint) {
-              _sensorHistory = [..._sensorHistory, cloudLatest];
-              if (_sensorHistory.length > 100) {
-                _sensorHistory = _sensorHistory.sublist(_sensorHistory.length - 100);
-              }
+          if (hasNewPoint) {
+            _sensorHistory = [..._sensorHistory, cloudLatest];
+            if (_sensorHistory.length > 100) {
+              _sensorHistory = _sensorHistory.sublist(_sensorHistory.length - 100);
             }
           }
 
           // Always stop fallback simulation when live Firebase data exists.
-          if (_isFallbackSimulationActive && !_sensorService.manualSimulationEnabled) {
+          if (_isFallbackSimulationActive) {
             _sensorService.stopSensorSimulation();
             _isFallbackSimulationActive = false;
           }
-        } else if (!_sensorService.manualSimulationEnabled) {
+        } else {
           // Start fallback simulation only when no cloud data is available.
           _sensorService.startSensorSimulation();
           _isFallbackSimulationActive = true;
