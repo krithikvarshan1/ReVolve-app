@@ -594,8 +594,17 @@ class _DashboardScreenState extends State<DashboardScreen> {
                     : Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          if (sensor.isPredictiveLoading)
+                          if (sensor.isPredictiveLoading) ...[
                             const LinearProgressIndicator(minHeight: 3),
+                            const SizedBox(height: 8),
+                            const Text(
+                              'Analyzing sensor data...',
+                              style: TextStyle(
+                                color: Color(0xFF334155),
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
                           if (sensor.predictiveError != null) ...[
                             const SizedBox(height: 8),
                             Text(
@@ -607,33 +616,37 @@ class _DashboardScreenState extends State<DashboardScreen> {
                             ),
                           ],
                           const SizedBox(height: 8),
-                          ...prediction.insights
-                              .map(
-                                (item) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 10),
-                                  child: Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      const Icon(
-                                        Icons.lightbulb_rounded,
-                                        color: Color(0xFFF59E0B),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(child: Text(item)),
-                                    ],
+                          if (predictive != null) ...[
+                            Padding(
+                              padding: const EdgeInsets.only(bottom: 10),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Icon(
+                                    Icons.lightbulb_rounded,
+                                    color: Color(0xFFF59E0B),
                                   ),
-                                ),
-                              )
-                              .toList(),
-                          if (predictive != null)
-                            Text(
-                              'Recommendation: ${predictive.maintenanceRecommendation}',
-                              style: const TextStyle(
-                                fontWeight: FontWeight.w700,
-                                color: Color(0xFF1D4ED8),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      '${predictive.aiEmoji ?? '💡'} ${predictive.aiInsight ?? prediction.insights.join(' ')}',
+                                    ),
+                                  ),
+                                ],
                               ),
                             ),
+                            Text(
+                              'Recommendation: ${predictive.maintenanceRecommendation}',
+                              style: TextStyle(
+                                fontWeight: FontWeight.w700,
+                                color: _recommendationColor(
+                                  predictive.maintenanceRecommendation,
+                                ),
+                              ),
+                            ),
+                          ] else ...[
+                            Text(prediction.insights.join(' ')),
+                          ],
                         ],
                       ),
               ),
@@ -650,7 +663,7 @@ class _DashboardScreenState extends State<DashboardScreen> {
             children: [
               _valueTile(
                 'Temperature',
-                latest == null ? '--' : '${latest.temperature.toStringAsFixed(1)} C',
+                latest == null ? '--' : '${latest.temperature.toStringAsFixed(1)} °C',
               ),
               _valueTile(
                 'Vibration',
@@ -2051,6 +2064,19 @@ class _DashboardScreenState extends State<DashboardScreen> {
         return const Color(0xFFB91C1C);
       default:
         return const Color(0xFF0F766E);
+    }
+  }
+
+  Color _recommendationColor(String recommendation) {
+    switch (recommendation.trim()) {
+      case 'No Action Needed':
+        return const Color(0xFF2563EB);
+      case 'Monitor Closely':
+        return const Color(0xFFEA580C);
+      case 'Immediate Attention Required':
+        return const Color(0xFFDC2626);
+      default:
+        return const Color(0xFF334155);
     }
   }
 }

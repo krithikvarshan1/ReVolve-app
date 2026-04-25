@@ -1,3 +1,5 @@
+import 'dart:math' as math;
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class SensorData {
@@ -57,65 +59,68 @@ class SensorData {
   // Factory constructor for creating from JSON (e.g., from API)
   factory SensorData.fromJson(Map<String, dynamic> json) {
     final temperature = _readDouble(
-      json,
-      const [
-        'temperature',
-        'temp',
-        'temperatureC',
-        'temperature_c',
-      ],
-      fallback: 0.0,
-    ) ??
+          json,
+          const ['temp'],
+          fallback:
+              _readDouble(
+                json,
+                const ['temperature', 'temperatureC', 'temperature_c'],
+                fallback: 0.0,
+              ) ??
+              0.0,
+        ) ??
         0.0;
 
-    final temperatureF = _readDouble(
-      json,
-      const ['temperatureF', 'temperature_f', 'tempF', 'temp_f'],
-    );
-
-    final normalizedTemperature = temperatureF != null
-        ? ((temperatureF - 32.0) * (5.0 / 9.0))
-        : temperature;
+    final adxlX = _readDouble(json, const ['adxl_x'], fallback: 0.0) ?? 0.0;
+    final adxlY = _readDouble(json, const ['adxl_y'], fallback: 0.0) ?? 0.0;
+    final adxlZ = _readDouble(json, const ['adxl_z'], fallback: 0.0) ?? 0.0;
+    final adxlMagnitude = math.sqrt((adxlX * adxlX) + (adxlY * adxlY) + (adxlZ * adxlZ));
+    final hasAdxlVector = json.containsKey('adxl_x') ||
+        json.containsKey('adxl_y') ||
+        json.containsKey('adxl_z');
+    final vibration = hasAdxlVector
+        ? double.parse(adxlMagnitude.toStringAsFixed(2))
+        : (_readDouble(
+                  json,
+                  const ['vibration', 'vib', 'vibration_g', 'vibrationG'],
+                  fallback: 0.0,
+                ) ??
+                0.0);
 
     return SensorData(
       id: _readString(json, const ['id', 'docId', 'recordId']) ?? '',
-      temperature: normalizedTemperature,
-      vibration: _readDouble(
-            json,
-            const [
-              'vibration',
-              'vib',
-              'vibration_g',
-              'vibrationG',
-              'mpu_a_mag',
-            ],
-            fallback: 0.0,
-          ) ??
-          0.0,
+      temperature: temperature,
+      vibration: vibration,
       current: _readDouble(
-            json,
-            const ['current', 'currentA', 'current_a', 'amps'],
-            fallback: 0.0,
-          ) ??
-          0.0,
+          json,
+          const ['current'],
+          fallback:
+              _readDouble(json, const ['currentA', 'current_a', 'amps'], fallback: 0.0) ??
+              0.0,
+        ) ??
+        0.0,
       gas: _readDouble(
-            json,
-            const ['gas', 'gasPpm', 'gas_ppm', 'mq2', 'mq135'],
-            fallback: 0.0,
-          ) ??
-          0.0,
+          json,
+          const ['gas'],
+          fallback: _readDouble(json, const ['gasPpm', 'gas_ppm', 'mq2', 'mq135'], fallback: 0.0) ??
+              0.0,
+        ) ??
+        0.0,
       dust: _readDouble(
-            json,
-            const ['dust', 'dustPpm', 'dust_ppm', 'dust_density', 'pm25'],
-            fallback: 0.0,
-          ) ??
-          0.0,
+          json,
+          const ['dust'],
+          fallback:
+              _readDouble(json, const ['dustPpm', 'dust_ppm', 'dust_density', 'pm25'], fallback: 0.0) ??
+              0.0,
+        ) ??
+        0.0,
       sound: _readDouble(
-            json,
-            const ['sound', 'soundDb', 'sound_db', 'noise', 'noise_db'],
-            fallback: 0.0,
-          ) ??
-          0.0,
+          json,
+          const ['sound'],
+          fallback: _readDouble(json, const ['soundDb', 'sound_db', 'noise', 'noise_db'], fallback: 0.0) ??
+              0.0,
+        ) ??
+        0.0,
       timestamp: _readTimestamp(
         json,
         const ['timestamp', 'time', 'createdAt', 'created_at', 'ts'],

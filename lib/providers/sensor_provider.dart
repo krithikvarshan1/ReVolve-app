@@ -55,6 +55,11 @@ class SensorProvider with ChangeNotifier {
   void _init() {
     // Listen to sensor stream
     _sensorService.sensorStream.listen((data) {
+      // Ignore simulation ticks unless manual mode or fallback simulation is active.
+      if (!_sensorService.manualSimulationEnabled && !_isFallbackSimulationActive) {
+        return;
+      }
+
       _latestData = data;
       _sensorHistory.add(data);
 
@@ -104,25 +109,16 @@ class SensorProvider with ChangeNotifier {
       stream.listen((data) {
         if (data.isNotEmpty) {
           final cloudLatest = data.last;
-          final cloudDataIsFresh = _isFreshReading(cloudLatest);
+          _sensorHistory = data;
+          _latestData = cloudLatest;
 
-          // Keep fallback simulation active when cloud data is stale so
-          // dashboard values continue to move in demo/offline conditions.
-          if (cloudDataIsFresh || _sensorHistory.isEmpty) {
-            _sensorHistory = data;
-            _latestData = _sensorHistory.last;
-          }
-
-          if (cloudDataIsFresh &&
-              _isFallbackSimulationActive &&
-              !_sensorService.manualSimulationEnabled) {
+          // Always stop fallback simulation when live Firebase data exists.
+          if (_isFallbackSimulationActive && !_sensorService.manualSimulationEnabled) {
             _sensorService.stopSensorSimulation();
             _isFallbackSimulationActive = false;
-          } else if (!cloudDataIsFresh && !_sensorService.manualSimulationEnabled) {
-            _sensorService.startSensorSimulation();
-            _isFallbackSimulationActive = true;
           }
         } else if (!_sensorService.manualSimulationEnabled) {
+          // Start fallback simulation only when no cloud data is available.
           _sensorService.startSensorSimulation();
           _isFallbackSimulationActive = true;
         }
@@ -155,20 +151,26 @@ class SensorProvider with ChangeNotifier {
 
   Future<void> _updatePredictiveResult(SensorData data) async {
     _isPredictiveLoading = true;
+    _predictiveError = null;
     notifyListeners();
 
     try {
       _latestPredictiveResult = await _predictiveService.fetchPrediction(data);
       _predictiveError = null;
     } catch (_) {
-      // Backend unavailable or timed out — use local ML prediction as fallback.
+      // If prediction processing fails, use local fallback analysis.
       try {
         _latestPrediction ??= _mlService.predictLifecycle(_sensorHistory);
         _latestPredictiveResult = PredictiveMaintenanceResult.fromLocalPrediction(
           sensorData: data,
           prediction: _latestPrediction!,
+        ).copyWithAi(
+          aiInsight:
+              'Live readings were analyzed locally because Claude could not be reached.',
+          aiEmoji: '⚠️',
+          maintenanceRecommendation: 'Monitor Closely',
         );
-        _predictiveError = 'Backend unavailable — using local prediction.';
+        _predictiveError = 'Using local analysis.';
       } catch (_) {
         // Last-resort: build a minimal result directly from sensor data so the
         // Predictive Console never stays blank.
@@ -185,8 +187,11 @@ class SensorProvider with ChangeNotifier {
           forecastSeries: List.generate(12, (i) => data.temperature + i * 0.2, growable: false),
           timestamp: DateTime.now(),
           deviceId: data.deviceId,
+          aiInsight:
+              'Live readings were analyzed locally because Claude could not be reached.',
+          aiEmoji: '⚠️',
         );
-        _predictiveError = 'Using sensor-derived estimates.';
+        _predictiveError = 'Using local analysis.';
       }
     }
 
@@ -205,16 +210,21 @@ class SensorProvider with ChangeNotifier {
   }
 
   void startSensorMonitoring() {
-    if (_sensorService.manualSimulationEnabled || !_firebaseService.isAvailable) {
+    if (_sensorService.manualSimulationEnabled) {
       _sensorService.startSensorSimulation();
       _isFallbackSimulationActive = true;
       return;
     }
 
-    if (_latestData == null) {
+    if (!_firebaseService.isAvailable) {
       _sensorService.startSensorSimulation();
       _isFallbackSimulationActive = true;
+      return;
     }
+
+    // Firebase is available: wait for onValue stream instead of forcing simulation.
+    _sensorService.stopSensorSimulation();
+    _isFallbackSimulationActive = false;
   }
 
   void setManualSimulationEnabled(bool enabled) {

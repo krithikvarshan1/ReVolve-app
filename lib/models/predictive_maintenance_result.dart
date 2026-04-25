@@ -14,6 +14,8 @@ class PredictiveMaintenanceResult {
     required this.forecastSeries,
     required this.timestamp,
     required this.deviceId,
+    this.aiInsight,
+    this.aiEmoji,
   });
 
   final String faultPrediction;
@@ -27,6 +29,8 @@ class PredictiveMaintenanceResult {
   final List<double> forecastSeries;
   final DateTime timestamp;
   final String deviceId;
+  final String? aiInsight;
+  final String? aiEmoji;
 
   bool get isAnomaly => anomalyStatus.toUpperCase() == 'ANOMALY';
 
@@ -51,6 +55,8 @@ class PredictiveMaintenanceResult {
           .toList(growable: false),
       timestamp: DateTime.now(),
       deviceId: deviceId,
+      aiInsight: json['ai_insight']?.toString(),
+      aiEmoji: json['ai_emoji']?.toString(),
     );
   }
 
@@ -106,6 +112,8 @@ class PredictiveMaintenanceResult {
       ),
       timestamp: DateTime.now(),
       deviceId: sensorData.deviceId,
+      aiInsight: prediction.insights.isNotEmpty ? prediction.insights.first : null,
+      aiEmoji: '💡',
     );
   }
 
@@ -122,7 +130,32 @@ class PredictiveMaintenanceResult {
       'forecast_series': forecastSeries,
       'timestamp': timestamp.toIso8601String(),
       'device_id': deviceId,
+      if (aiInsight != null) 'ai_insight': aiInsight,
+      if (aiEmoji != null) 'ai_emoji': aiEmoji,
     };
+  }
+
+  PredictiveMaintenanceResult copyWithAi({
+    String? aiInsight,
+    String? aiEmoji,
+    String? maintenanceRecommendation,
+  }) {
+    return PredictiveMaintenanceResult(
+      faultPrediction: faultPrediction,
+      faultConfidence: faultConfidence,
+      remainingUsefulLife: remainingUsefulLife,
+      anomalyStatus: anomalyStatus,
+      futureForecastTemp: futureForecastTemp,
+      maintenanceRecommendation:
+          maintenanceRecommendation ?? this.maintenanceRecommendation,
+      healthScore: healthScore,
+      riskLevel: riskLevel,
+      forecastSeries: forecastSeries,
+      timestamp: timestamp,
+      deviceId: deviceId,
+      aiInsight: aiInsight ?? this.aiInsight,
+      aiEmoji: aiEmoji ?? this.aiEmoji,
+    );
   }
 
   static int _normalizeRulToHours(double rawValue) {

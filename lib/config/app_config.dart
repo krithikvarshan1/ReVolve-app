@@ -10,6 +10,16 @@ class AppConfig {
   static const String predictiveMaintenanceEndpoint = '/predictive-maintenance';
   static const String chatbotEndpoint = '/chat-assistant';
 
+  // Firebase Realtime Database root URL and telemetry path.
+  static const String realtimeDatabaseUrl = String.fromEnvironment(
+    'FIREBASE_RTDB_URL',
+    defaultValue: 'https://revolve-4edcf-default-rtdb.firebaseio.com',
+  );
+  static const String realtimeSensorDataPath = String.fromEnvironment(
+    'FIREBASE_RTDB_SENSOR_PATH',
+    defaultValue: 'sensor_data',
+  );
+
   // Optional: restrict Firebase live stream to a specific hardware device id.
   // Leave empty to read all device documents in sensor_data.
   static const String sensorDeviceId = String.fromEnvironment(
