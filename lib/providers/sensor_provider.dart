@@ -109,8 +109,26 @@ class SensorProvider with ChangeNotifier {
       stream.listen((data) {
         if (data.isNotEmpty) {
           final cloudLatest = data.last;
-          _sensorHistory = data;
           _latestData = cloudLatest;
+
+          if (_sensorService.manualSimulationEnabled) {
+            // Keep the existing behavior for manual simulation mode.
+            _sensorHistory = data;
+          } else {
+            // Live Firebase mode: append newest reading so trend chart grows over time.
+            final hasNewPoint = _sensorHistory.isEmpty ||
+                _sensorHistory.last.timestamp != cloudLatest.timestamp ||
+                _sensorHistory.last.temperature != cloudLatest.temperature ||
+                _sensorHistory.last.vibration != cloudLatest.vibration ||
+                _sensorHistory.last.current != cloudLatest.current;
+
+            if (hasNewPoint) {
+              _sensorHistory = [..._sensorHistory, cloudLatest];
+              if (_sensorHistory.length > 100) {
+                _sensorHistory = _sensorHistory.sublist(_sensorHistory.length - 100);
+              }
+            }
+          }
 
           // Always stop fallback simulation when live Firebase data exists.
           if (_isFallbackSimulationActive && !_sensorService.manualSimulationEnabled) {
