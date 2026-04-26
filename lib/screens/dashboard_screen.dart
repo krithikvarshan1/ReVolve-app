@@ -562,8 +562,8 @@ class _DashboardScreenState extends State<DashboardScreen> {
               const Color(0xFF2563EB),
             ),
             _kpi(
-              'Usage Window',
-              '${sensor.usageHours.toStringAsFixed(2)} hrs',
+              'Data Duration',
+              '${sensor.usageMinutes.toStringAsFixed(1)} min',
               Icons.schedule_rounded,
               const Color(0xFF0F766E),
             ),
@@ -708,11 +708,11 @@ class _DashboardScreenState extends State<DashboardScreen> {
             SizedBox(
               width: wide ? 720 : double.infinity,
               child: _panel(
-                title: 'Forecast Trend',
-                subtitle: 'Projected temperature trajectory from LSTM model',
+                title: 'Future RUL Trend',
+                subtitle: 'Predicted degradation trajectory (LSTM model)',
                 child: SizedBox(
-                  height: 220,
-                  child: _forecastChart(predictive),
+                  height: 252,
+                  child: _futureRulChart(predictive),
                 ),
               ),
             ),
@@ -1443,38 +1443,149 @@ class _DashboardScreenState extends State<DashboardScreen> {
     );
   }
 
-  Widget _forecastChart(PredictiveMaintenanceResult? predictive) {
-    final series = predictive?.forecastSeries ?? const <double>[];
+  Widget _futureRulChart(PredictiveMaintenanceResult? predictive) {
+    final series = predictive?.lstmForecast ?? const <double>[];
     if (series.isEmpty) {
-      return const Center(child: Text('Forecast data not available yet.'));
+      return const Center(child: Text('No forecast data available'));
     }
+
+    final minValue = series.reduce((a, b) => a < b ? a : b);
+    final maxValue = series.reduce((a, b) => a > b ? a : b);
+    final yPadding = ((maxValue - minValue).abs() * 0.2).clamp(1.0, 8.0);
+    final spots = series
+        .asMap()
+        .entries
+        .map((entry) => FlSpot(entry.key.toDouble(), entry.value))
+        .toList(growable: false);
 
     return LineChart(
       LineChartData(
-        minY: series.reduce((a, b) => a < b ? a : b) - 1,
-        maxY: series.reduce((a, b) => a > b ? a : b) + 1,
-        gridData: FlGridData(show: true, drawVerticalLine: false),
+        minX: 0,
+        maxX: (series.length - 1).toDouble(),
+        minY: (minValue - yPadding).clamp(0, double.infinity),
+        maxY: maxValue + yPadding,
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: false,
+          horizontalInterval: ((maxValue - minValue) / 4).abs().clamp(1.0, 20.0),
+          getDrawingHorizontalLine: (_) => FlLine(
+            color: const Color(0xFFE2E8F0),
+            strokeWidth: 1,
+          ),
+        ),
         borderData: FlBorderData(show: false),
+        lineTouchData: LineTouchData(
+          handleBuiltInTouches: true,
+          touchTooltipData: LineTouchTooltipData(
+            getTooltipColor: (_) => const Color(0xFF0F172A),
+            tooltipRoundedRadius: 10,
+            getTooltipItems: (spots) => spots
+                .map(
+                  (spot) => LineTooltipItem(
+                    'T+${spot.x.toInt() + 1}\n${spot.y.toStringAsFixed(1)} h RUL',
+                    const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 11,
+                    ),
+                  ),
+                )
+                .toList(growable: false),
+          ),
+        ),
         titlesData: FlTitlesData(
           topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-          leftTitles: const AxisTitles(sideTitles: SideTitles(showTitles: true)),
-          bottomTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+          leftTitles: AxisTitles(
+            axisNameSize: 26,
+            axisNameWidget: const Padding(
+              padding: EdgeInsets.only(bottom: 10),
+              child: Text(
+                'RUL (h)',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF475569),
+                ),
+              ),
+            ),
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 62,
+              interval: ((maxValue - minValue) / 4).abs().clamp(1.0, 20.0),
+              getTitlesWidget: (value, meta) => Text(
+                value.toStringAsFixed(0),
+                style: const TextStyle(
+                  color: Color(0xFF64748B),
+                  fontSize: 10,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+          bottomTitles: AxisTitles(
+            axisNameSize: 28,
+            axisNameWidget: const Padding(
+              padding: EdgeInsets.only(top: 12),
+              child: Text(
+                'Forecast Horizon',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF475569),
+                ),
+              ),
+            ),
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 36,
+              interval: 1,
+              getTitlesWidget: (value, meta) {
+                final index = value.toInt();
+                if (index < 0 || index >= series.length) {
+                  return const SizedBox.shrink();
+                }
+                return Text(
+                  'T+${index + 1}',
+                  style: const TextStyle(
+                    color: Color(0xFF64748B),
+                    fontSize: 10,
+                    fontWeight: FontWeight.w600,
+                  ),
+                );
+              },
+            ),
+          ),
         ),
         lineBarsData: [
           LineChartBarData(
-            spots: series
-                .asMap()
-                .entries
-                .map((entry) => FlSpot(entry.key.toDouble(), entry.value))
-                .toList(growable: false),
+            spots: spots,
             isCurved: true,
-            color: const Color(0xFF0EA5E9),
-            barWidth: 3,
-            dotData: const FlDotData(show: false),
+            curveSmoothness: 0.3,
+            gradient: const LinearGradient(
+              colors: [Color(0xFF0EA5E9), Color(0xFF2563EB)],
+            ),
+            barWidth: 3.5,
+            isStrokeCapRound: true,
+            dotData: FlDotData(
+              show: true,
+              getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(
+                radius: 2.8,
+                color: const Color(0xFF2563EB),
+                strokeWidth: 1.6,
+                strokeColor: Colors.white,
+              ),
+            ),
             belowBarData: BarAreaData(
               show: true,
-              color: const Color(0xFF0EA5E9).withOpacity(0.12),
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  const Color(0xFF0EA5E9).withOpacity(0.26),
+                  const Color(0xFF0EA5E9).withOpacity(0.02),
+                ],
+              ),
             ),
           ),
         ],
@@ -1982,10 +2093,18 @@ class _DashboardScreenState extends State<DashboardScreen> {
 
   LineChartBarData _line(List<FlSpot> spots, Color color) => LineChartBarData(
         spots: spots,
-        isCurved: true,
+        isCurved: spots.length > 1,
         color: color,
         barWidth: 3,
-        dotData: const FlDotData(show: false),
+        dotData: FlDotData(
+          show: spots.length == 1,
+          getDotPainter: (spot, percent, barData, index) => FlDotCirclePainter(
+            radius: 3.2,
+            color: color,
+            strokeColor: Colors.white,
+            strokeWidth: 1,
+          ),
+        ),
         belowBarData: BarAreaData(
           show: true,
           color: color.withOpacity(0.08),

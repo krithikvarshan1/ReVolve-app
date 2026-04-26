@@ -12,6 +12,7 @@ class PredictiveMaintenanceResult {
     required this.healthScore,
     required this.riskLevel,
     required this.forecastSeries,
+    required this.lstmForecast,
     required this.timestamp,
     required this.deviceId,
     this.aiInsight,
@@ -27,6 +28,7 @@ class PredictiveMaintenanceResult {
   final int healthScore;
   final String riskLevel;
   final List<double> forecastSeries;
+  final List<double> lstmForecast;
   final DateTime timestamp;
   final String deviceId;
   final String? aiInsight;
@@ -38,6 +40,13 @@ class PredictiveMaintenanceResult {
     Map<String, dynamic> json, {
     required String deviceId,
   }) {
+    final legacyForecast = (json['forecast_series'] as List<dynamic>? ?? const [])
+        .map((value) => (value as num).toDouble())
+        .toList(growable: false);
+    final lstmForecast = (json['lstm_forecast'] as List<dynamic>? ?? const [])
+        .map((value) => (value as num).toDouble())
+        .toList(growable: false);
+
     return PredictiveMaintenanceResult(
       faultPrediction: (json['fault_prediction'] ?? 'NORMAL').toString(),
       faultConfidence: (json['fault_confidence'] as num?)?.toDouble() ?? 0,
@@ -50,9 +59,8 @@ class PredictiveMaintenanceResult {
           (json['maintenance_recommendation'] ?? 'No Action Needed').toString(),
       healthScore: (json['health_score'] as num?)?.round() ?? 0,
       riskLevel: (json['risk_level'] ?? 'LOW').toString(),
-      forecastSeries: (json['forecast_series'] as List<dynamic>? ?? const [])
-          .map((value) => (value as num).toDouble())
-          .toList(growable: false),
+        forecastSeries: legacyForecast,
+        lstmForecast: lstmForecast,
       timestamp: DateTime.now(),
       deviceId: deviceId,
       aiInsight: json['ai_insight']?.toString(),
@@ -105,11 +113,8 @@ class PredictiveMaintenanceResult {
       ),
       healthScore: healthScore,
       riskLevel: riskLevel,
-      forecastSeries: List<double>.generate(
-        12,
-        (index) => sensorData.temperature + (index * 0.25),
-        growable: false,
-      ),
+      forecastSeries: const [],
+      lstmForecast: _buildDescendingRulForecast(remainingUsefulLife),
       timestamp: DateTime.now(),
       deviceId: sensorData.deviceId,
       aiInsight: prediction.insights.isNotEmpty ? prediction.insights.first : null,
@@ -128,6 +133,7 @@ class PredictiveMaintenanceResult {
       'health_score': healthScore,
       'risk_level': riskLevel,
       'forecast_series': forecastSeries,
+      'lstm_forecast': lstmForecast,
       'timestamp': timestamp.toIso8601String(),
       'device_id': deviceId,
       if (aiInsight != null) 'ai_insight': aiInsight,
@@ -151,10 +157,21 @@ class PredictiveMaintenanceResult {
       healthScore: healthScore,
       riskLevel: riskLevel,
       forecastSeries: forecastSeries,
+        lstmForecast: lstmForecast,
       timestamp: timestamp,
       deviceId: deviceId,
       aiInsight: aiInsight ?? this.aiInsight,
       aiEmoji: aiEmoji ?? this.aiEmoji,
+    );
+  }
+
+  static List<double> _buildDescendingRulForecast(int rul, {int steps = 12}) {
+    final start = rul.toDouble().clamp(0.0, 100000.0);
+    final decay = start <= 0 ? 0.0 : (start / (steps + 2)).clamp(1.0, 50.0);
+    return List<double>.generate(
+      steps,
+      (index) => (start - (decay * index)).clamp(0.0, 100000.0).toDouble(),
+      growable: false,
     );
   }
 

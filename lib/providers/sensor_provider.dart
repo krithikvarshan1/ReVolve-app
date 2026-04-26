@@ -34,6 +34,7 @@ class SensorProvider with ChangeNotifier {
   final Map<String, DateTime> _lastAlertAt = {};
   // Throttle: only hit the backend once per mlPredictionInterval (default 30s).
   DateTime? _lastPredictiveCallAt;
+  bool _isPredictiveRequestInFlight = false;
 
   List<SensorData> get sensorHistory => _sensorHistory;
   SensorData? get latestData => _latestData;
@@ -74,16 +75,7 @@ class SensorProvider with ChangeNotifier {
       // Update ML prediction (local, every tick)
       _updatePrediction();
 
-      // Hit the backend at most once per mlPredictionInterval to avoid
-      // flooding the server with 1,500+ concurrent hanging requests.
-      final now = DateTime.now();
-      final sinceLastCall = _lastPredictiveCallAt == null
-          ? AppConfig.mlPredictionInterval
-          : now.difference(_lastPredictiveCallAt!);
-      if (sinceLastCall >= AppConfig.mlPredictionInterval) {
-        _lastPredictiveCallAt = now;
-        unawaited(_updatePredictiveResult(data));
-      }
+      _maybeTriggerPredictiveUpdate(data);
       _handleSafetyAutomation(data);
 
       notifyListeners();
@@ -144,7 +136,7 @@ class SensorProvider with ChangeNotifier {
         }
         _updatePrediction();
         if (_latestData != null) {
-          unawaited(_updatePredictiveResult(_latestData!));
+          _maybeTriggerPredictiveUpdate(_latestData!);
         }
         _isLoading = false;
         notifyListeners();
@@ -167,6 +159,25 @@ class SensorProvider with ChangeNotifier {
       // Save prediction to Firebase
       _firebaseService.saveMLPrediction(_latestPrediction!);
     }
+  }
+
+  void _maybeTriggerPredictiveUpdate(SensorData data) {
+    if (_isPredictiveRequestInFlight) {
+      return;
+    }
+
+    final now = DateTime.now();
+    final sinceLastCall = _lastPredictiveCallAt == null
+        ? AppConfig.mlPredictionInterval
+        : now.difference(_lastPredictiveCallAt!);
+
+    if (sinceLastCall < AppConfig.mlPredictionInterval) {
+      return;
+    }
+
+    _lastPredictiveCallAt = now;
+    _isPredictiveRequestInFlight = true;
+    unawaited(_updatePredictiveResult(data));
   }
 
   Future<void> _updatePredictiveResult(SensorData data) async {
@@ -204,7 +215,8 @@ class SensorProvider with ChangeNotifier {
           maintenanceRecommendation: healthPct > 70 ? 'No Action Needed' : 'Schedule Inspection',
           healthScore: healthPct.round(),
           riskLevel: healthPct > 70 ? 'LOW' : healthPct > 40 ? 'MEDIUM' : 'HIGH',
-          forecastSeries: List.generate(12, (i) => data.temperature + i * 0.2, growable: false),
+          forecastSeries: const [],
+          lstmForecast: _buildDescendingRulForecast((healthPct * 20).round()),
           timestamp: DateTime.now(),
           deviceId: data.deviceId,
           aiInsight:
@@ -214,7 +226,6 @@ class SensorProvider with ChangeNotifier {
         _predictiveError = 'Using local analysis.';
       }
     }
-
     if (_latestPredictiveResult != null) {
       _predictionHistory.add(_latestPredictiveResult!);
       unawaited(
@@ -225,8 +236,19 @@ class SensorProvider with ChangeNotifier {
       }
     }
 
+    _isPredictiveRequestInFlight = false;
     _isPredictiveLoading = false;
     notifyListeners();
+  }
+
+  List<double> _buildDescendingRulForecast(int rul, {int steps = 12}) {
+    final start = rul.toDouble().clamp(0.0, 100000.0);
+    final decay = start <= 0 ? 0.0 : (start / (steps + 2)).clamp(1.0, 50.0);
+    return List<double>.generate(
+      steps,
+      (index) => (start - (decay * index)).clamp(0.0, 100000.0).toDouble(),
+      growable: false,
+    );
   }
 
   void startSensorMonitoring() {
@@ -306,12 +328,31 @@ class SensorProvider with ChangeNotifier {
 
   double get healthScore => _latestData?.healthScore ?? 0.0;
 
-  double get usageHours {
+  double get usageMinutes {
     if (_sensorHistory.length < 2) {
       return 0.0;
     }
-    final duration = _sensorHistory.last.timestamp.difference(_sensorHistory.first.timestamp);
-    return duration.inSeconds / 3600;
+
+    DateTime minTs = _sensorHistory.first.timestamp;
+    DateTime maxTs = _sensorHistory.first.timestamp;
+    for (final sample in _sensorHistory.skip(1)) {
+      if (sample.timestamp.isBefore(minTs)) {
+        minTs = sample.timestamp;
+      }
+      if (sample.timestamp.isAfter(maxTs)) {
+        maxTs = sample.timestamp;
+      }
+    }
+
+    final duration = maxTs.difference(minTs);
+    if (duration.isNegative) {
+      return 0.0;
+    }
+    return duration.inSeconds / 60.0;
+  }
+
+  double get usageHours {
+    return usageMinutes / 60.0;
   }
 
   int get anomalyCount => checkForAlerts().length;
