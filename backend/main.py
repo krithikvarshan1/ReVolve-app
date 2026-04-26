@@ -5,6 +5,7 @@ import pickle
 import re
 import json
 import logging
+from itertools import product
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -75,6 +76,28 @@ class ChatResponse(BaseModel):
     confidence: float
     suggested_questions: list[str] = []
     source: str = "fallback"
+
+
+class PredictiveCombinationRequest(BaseModel):
+    temperature_values: list[float] = Field(default_factory=list)
+    vibration_values: list[float] = Field(default_factory=list)
+    current_values: list[float] = Field(default_factory=list)
+    gas_values: list[float] = Field(default_factory=list)
+    dust_values: list[float] = Field(default_factory=list)
+    sound_values: list[float] = Field(default_factory=list)
+    deviceId: str | None = None
+    max_combinations: int = Field(1000, ge=1, le=50000)
+
+
+class PredictiveCombinationRow(BaseModel):
+    input: SensorInput
+    output: PredictiveResponse
+
+
+class PredictiveCombinationResponse(BaseModel):
+    total_combinations: int
+    returned_combinations: int
+    rows: list[PredictiveCombinationRow]
 
 
 @dataclass
@@ -178,6 +201,163 @@ def _find_best_chat_answer(query: str) -> tuple[str, float]:
 
     confidence = min(0.95, 0.45 + best_score * 0.15)
     return best_answer, round(confidence, 2)
+
+
+def _clamp(value: float, lower: float, upper: float) -> float:
+    return max(lower, min(upper, value))
+
+
+def _predictive_rule_engine(sensor: SensorInput) -> PredictiveResponse:
+    # Rules tuned for a single-phase 0.5 HP AC induction motor telemetry profile.
+    temp_warn, temp_fault, temp_critical = 70.0, 80.0, 95.0
+    current_warn, current_fault, current_critical = 4.2, 5.0, 6.2
+    vib_warn, vib_fault, vib_critical = 1.8, 2.8, 4.0
+    sound_warn, sound_fault, sound_critical = 62.0, 72.0, 82.0
+    dust_warn, dust_fault, dust_critical = 180.0, 280.0, 380.0
+    gas_warn, gas_fault, gas_critical = 250.0, 450.0, 700.0
+
+    temp_risk = _clamp((sensor.temperature - temp_warn) / (temp_critical - temp_warn), 0.0, 1.0)
+    current_risk = _clamp((sensor.current - current_warn) / (current_critical - current_warn), 0.0, 1.0)
+    vibration_risk = _clamp((sensor.vibration - vib_warn) / (vib_critical - vib_warn), 0.0, 1.0)
+    dust_risk = _clamp((sensor.dust - dust_warn) / (dust_critical - dust_warn), 0.0, 1.0)
+    gas_risk = _clamp((sensor.gas - gas_warn) / (gas_critical - gas_warn), 0.0, 1.0)
+    env_risk = max(dust_risk, gas_risk)
+    sound_risk = _clamp((sensor.sound - sound_warn) / (sound_critical - sound_warn), 0.0, 1.0)
+
+    overheat_issue = sensor.temperature >= temp_fault
+    dust_fault_issue = sensor.dust >= dust_fault or sensor.gas >= gas_fault
+    overload_issue = sensor.current >= current_fault
+    vibration_issue = sensor.vibration >= vib_fault
+    bearing_issue = (
+        (sensor.vibration >= vib_warn and sensor.sound >= sound_fault)
+        or (sensor.vibration >= vib_fault and sensor.temperature >= temp_warn)
+    )
+
+    critical_limit_crossed = (
+        sensor.temperature >= temp_critical
+        or sensor.current >= current_critical
+        or sensor.vibration >= vib_critical
+        or sensor.sound >= sound_critical
+        or sensor.dust >= dust_critical
+        or sensor.gas >= gas_critical
+    )
+    severe_count = sum(
+        [
+            1 if overheat_issue else 0,
+            1 if dust_fault_issue else 0,
+            1 if overload_issue else 0,
+            1 if vibration_issue else 0,
+            1 if bearing_issue else 0,
+        ]
+    )
+    failure_imminent = critical_limit_crossed or severe_count >= 2
+
+    if failure_imminent:
+        fault_prediction = "FAILURE_IMMINENT"
+    elif bearing_issue:
+        fault_prediction = "BEARING_WEAR"
+    elif vibration_issue:
+        fault_prediction = "VIBRATION_FAULT"
+    elif overload_issue:
+        fault_prediction = "OVERLOAD"
+    elif overheat_issue:
+        fault_prediction = "OVERHEAT"
+    elif dust_fault_issue:
+        fault_prediction = "DUST_FAULT"
+    else:
+        fault_prediction = "NORMAL"
+
+    fault_severity = {
+        "NORMAL": 0.00,
+        "DUST_FAULT": 0.45,
+        "OVERHEAT": 0.55,
+        "OVERLOAD": 0.60,
+        "VIBRATION_FAULT": 0.65,
+        "BEARING_WEAR": 0.78,
+        "FAILURE_IMMINENT": 1.00,
+    }[fault_prediction]
+
+    risk_score = 100.0 * (
+        (0.28 * temp_risk)
+        + (0.24 * current_risk)
+        + (0.20 * vibration_risk)
+        + (0.12 * env_risk)
+        + (0.10 * sound_risk)
+        + (0.06 * fault_severity)
+    )
+    if failure_imminent:
+        risk_score = max(risk_score, 88.0)
+
+    if risk_score < 25.0:
+        risk_level = "LOW"
+    elif risk_score < 50.0:
+        risk_level = "MEDIUM"
+    elif risk_score < 75.0:
+        risk_level = "HIGH"
+    else:
+        risk_level = "CRITICAL"
+
+    anomaly_status = "ANOMALY" if fault_prediction != "NORMAL" else "NORMAL"
+
+    health_score = int(round(_clamp(100.0 - risk_score, 0.0, 100.0)))
+    base_rul = 60.0 + (health_score * 14.0)
+    if fault_prediction == "FAILURE_IMMINENT":
+        base_rul = min(base_rul, 48.0)
+    elif fault_prediction in {"BEARING_WEAR", "VIBRATION_FAULT", "OVERHEAT", "OVERLOAD"}:
+        base_rul = min(base_rul, 420.0)
+    elif fault_prediction == "DUST_FAULT":
+        base_rul = min(base_rul, 720.0)
+    remaining_useful_life = int(round(_clamp(base_rul, 8.0, 1500.0)))
+
+    confidence_base = 56.0 + (risk_score * 0.34)
+    if fault_prediction == "NORMAL":
+        confidence_base = max(confidence_base, 62.0)
+    fault_confidence = round(_clamp(confidence_base, 55.0, 98.0), 2)
+
+    maintenance_recommendation = {
+        "NORMAL": "No immediate action needed. Continue routine monitoring.",
+        "OVERHEAT": "Inspect cooling path, fan, and ventilation. Reduce thermal load.",
+        "DUST_FAULT": "Clean motor housing and filters. Improve enclosure dust control.",
+        "OVERLOAD": "Reduce shaft load and check supply voltage/current balance.",
+        "VIBRATION_FAULT": "Check alignment, coupling, and rotor balance.",
+        "BEARING_WEAR": "Inspect bearings, lubrication, and replace if wear is confirmed.",
+        "FAILURE_IMMINENT": "Immediate shutdown and maintenance intervention required.",
+    }[fault_prediction]
+
+    forecast_adjust = {
+        "NORMAL": -0.2,
+        "DUST_FAULT": 1.2,
+        "OVERHEAT": 6.0,
+        "OVERLOAD": 3.5,
+        "VIBRATION_FAULT": 2.0,
+        "BEARING_WEAR": 4.5,
+        "FAILURE_IMMINENT": 9.0,
+    }[fault_prediction]
+    future_forecast_temp = round(_clamp(sensor.temperature + forecast_adjust, 0.0, 140.0), 3)
+
+    forecast_series = [
+        round(_clamp(future_forecast_temp - (index * 0.55), 18.0, 140.0), 3)
+        for index in range(12)
+    ]
+
+    lstm_forecast = []
+    start = _clamp(float(remaining_useful_life), 0.0, 100000.0)
+    decay = 0.0 if start <= 0 else _clamp(start / 14.0, 1.0, 50.0)
+    for index in range(12):
+        lstm_forecast.append(round(_clamp(start - (decay * index), 0.0, 100000.0), 3))
+
+    return PredictiveResponse(
+        fault_prediction=fault_prediction,
+        fault_confidence=round(fault_confidence, 2),
+        remaining_useful_life=remaining_useful_life,
+        anomaly_status=anomaly_status,
+        future_forecast_temp=future_forecast_temp,
+        maintenance_recommendation=maintenance_recommendation,
+        health_score=health_score,
+        risk_level=risk_level,
+        forecast_series=forecast_series,
+        lstm_forecast=lstm_forecast,
+    )
 
 
 def _suggested_questions() -> list[str]:
@@ -765,12 +945,8 @@ from contextlib import asynccontextmanager
 @asynccontextmanager
 async def _lifespan(application: FastAPI):
     global MODEL_REGISTRY
-    try:
-        MODEL_REGISTRY = load_models()
-        LOGGER.info("ML models loaded successfully from %s", MODEL_DIR)
-    except Exception as exc:
-        MODEL_REGISTRY = None
-        LOGGER.warning("Failed to load ML models from %s: %s", MODEL_DIR, exc)
+    MODEL_REGISTRY = None
+    LOGGER.info("Rule-based predictive backend initialized; ML model loading is disabled.")
     yield
 
 
@@ -803,18 +979,9 @@ app.add_middleware(
 @app.get("/health")
 def health() -> dict[str, Any]:
     ollama_ready = _is_ollama_available()
-    model_detail: dict[str, str] = {}
-    if MODEL_REGISTRY is None:
-        model_detail["status"] = "missing"
-    else:
-        model_detail["status"] = "loaded"
-        model_detail["fault_model"] = type(MODEL_REGISTRY.fault_model).__name__
-        model_detail["rul_model"] = type(MODEL_REGISTRY.rul_model).__name__
-        model_detail["anomaly_model"] = type(MODEL_REGISTRY.anomaly_model).__name__
-        model_detail["lstm_model"] = type(MODEL_REGISTRY.lstm_model).__name__
     return {
         "status": "ok",
-        "models": model_detail,
+        "predictive_mode": "rule-based",
         "chat_api": "ollama-active" if ollama_ready else "fallback-mode",
         "chat_model": OLLAMA_MODEL,
         "chat_provider": "ollama",
@@ -823,28 +990,12 @@ def health() -> dict[str, Any]:
 
 @app.get("/debug-models")
 def debug_models() -> dict[str, Any]:
-    """Diagnostic endpoint – shows which models loaded and any errors."""
-    results: dict[str, Any] = {"model_dir": str(MODEL_DIR), "files": []}
-    for f in MODEL_DIR.iterdir():
-        results["files"].append(f.name)
-
-    load_errors: dict[str, str] = {}
-    for name, loader in [
-        ("motor_fault_gpu_model.pkl", lambda p: _load_pickle(p)),
-        ("rul_proxy_model.pkl", lambda p: _load_pickle(p)),
-        ("improved_anomaly_model.pkl", lambda p: _load_pickle(p)),
-        ("label_encoder.pkl", lambda p: _load_pickle(p)),
-        ("lstm_forecast_model.pth", lambda p: _load_lstm_model(p)),
-    ]:
-        try:
-            loader(MODEL_DIR / name)  # type: ignore[operator]
-            load_errors[name] = "ok"
-        except Exception as exc:
-            load_errors[name] = str(exc)
-
-    results["load_results"] = load_errors
-    results["registry_loaded"] = MODEL_REGISTRY is not None
-    return results
+    """Diagnostic endpoint – reports rule-based inference status."""
+    return {
+        "model_dir": str(MODEL_DIR),
+        "predictive_mode": "rule-based",
+        "registry_loaded": False,
+    }
 
 @app.get("/")
 def root() -> dict[str, str]:
@@ -852,6 +1003,7 @@ def root() -> dict[str, str]:
         "message": "ReVolve Predictive Maintenance API is running.",
         "health": "/health",
         "predict": "/predictive-maintenance",
+        "predict_combinations": "/predictive-maintenance/combinations",
         "chat": "/chat-assistant",
     }
 
@@ -882,80 +1034,76 @@ def chat_assistant(payload: ChatRequest) -> ChatResponse:
 
 @app.post("/predictive-maintenance", response_model=PredictiveResponse)
 def predict(payload: SensorInput) -> PredictiveResponse:
-    if MODEL_REGISTRY is None:
-        raise HTTPException(status_code=503, detail="Models not loaded")
-
     LOGGER.info("API RECEIVED REQUEST")
     print("API RECEIVED REQUEST", flush=True)
-    features = _build_feature_vector(payload, MODEL_REGISTRY)
-    operational_proxy = _operational_health_proxy(payload)
 
     try:
-        fault_prediction, fault_confidence = _predict_fault(features, MODEL_REGISTRY)
-
-        # Calibrate overconfident classifier outputs with current sensor stress.
-        sensor_stress = (
-            (payload.temperature / 120.0)
-            + (payload.vibration / 10.0)
-            + (payload.current / 10.0)
-            + (payload.gas / 5000.0)
-            + (payload.dust / 4000.0)
-            + (payload.sound / 120.0)
-        ) / 6.0
-        fault_confidence = float(np.clip((0.72 * fault_confidence) + (sensor_stress * 24.0), 15.0, 99.0))
-        fault_confidence = round(fault_confidence, 2)
-
-        print("ABOUT TO CALL _predict_rul", flush=True)
-        rul = _predict_rul(features, payload, MODEL_REGISTRY)
-        print("RETURNED FROM _predict_rul", flush=True)
-        anomaly = _predict_anomaly(features, MODEL_REGISTRY)
-        future_temp, forecast_series = _predict_forecast(payload, MODEL_REGISTRY)
-
-        # If the raw sensor state is clearly healthy, avoid over-escalating the
-        # model labels. This keeps dashboard outputs aligned with the hardware state.
-        if operational_proxy >= 0.78 and rul > 300:
-            if fault_prediction in {
-                "DUST_FAULT",
-                "OVERHEAT",
-                "OVERLOAD",
-                "VIBRATION_FAULT",
-                "BEARING_WEAR",
-            }:
-                fault_prediction = "NORMAL"
-                fault_confidence = min(fault_confidence, 40.0)
-            anomaly = "NORMAL"
-
-        health_score, risk_level = _calculate_health_and_risk(
-            payload,
-            fault_prediction,
-            fault_confidence,
-            rul,
-            anomaly,
-        )
-        recommendation = _derive_recommendation(
-            fault_prediction,
-            anomaly,
-            risk_level,
-        )
-        rul_forecast = _build_rul_forecast_series(rul, payload)
-
-        return PredictiveResponse(
-            fault_prediction=fault_prediction,
-            fault_confidence=fault_confidence,
-            remaining_useful_life=rul,
-            anomaly_status=anomaly,
-            future_forecast_temp=future_temp,
-            maintenance_recommendation=recommendation,
-            health_score=health_score,
-            risk_level=risk_level,
-            forecast_series=[round(x, 3) for x in forecast_series],
-            lstm_forecast=rul_forecast,
-        )
+        return _predictive_rule_engine(payload)
     except Exception as exc:
         raise HTTPException(status_code=500, detail=f"Inference failed: {exc}") from exc
     finally:
         LOGGER.info("API FINISHED PROCESSING")
         print("API FINISHED PROCESSING", flush=True)
+
+
+@app.post(
+    "/predictive-maintenance/combinations",
+    response_model=PredictiveCombinationResponse,
+)
+def predict_combinations(
+    payload: PredictiveCombinationRequest,
+) -> PredictiveCombinationResponse:
+    temps = payload.temperature_values or [45.0]
+    vibs = payload.vibration_values or [1.0]
+    currents = payload.current_values or [2.5]
+    gases = payload.gas_values or [150.0]
+    dusts = payload.dust_values or [100.0]
+    sounds = payload.sound_values or [50.0]
+
+    total = (
+        len(temps)
+        * len(vibs)
+        * len(currents)
+        * len(gases)
+        * len(dusts)
+        * len(sounds)
+    )
+
+    if total > payload.max_combinations:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Requested {total} combinations exceeds max_combinations="
+                f"{payload.max_combinations}."
+            ),
+        )
+
+    rows: list[PredictiveCombinationRow] = []
+    for temp, vib, current, gas, dust, sound in product(
+        temps,
+        vibs,
+        currents,
+        gases,
+        dusts,
+        sounds,
+    ):
+        sensor_input = SensorInput(
+            temperature=float(temp),
+            vibration=float(vib),
+            current=float(current),
+            gas=float(gas),
+            dust=float(dust),
+            sound=float(sound),
+            deviceId=payload.deviceId,
+        )
+        prediction = _predictive_rule_engine(sensor_input)
+        rows.append(PredictiveCombinationRow(input=sensor_input, output=prediction))
+
+    return PredictiveCombinationResponse(
+        total_combinations=total,
+        returned_combinations=len(rows),
+        rows=rows,
+    )
 
 
 if __name__ == "__main__":
