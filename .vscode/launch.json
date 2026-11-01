@@ -7,7 +7,8 @@
       "type": "dart",
       "deviceId": "chrome",
       "toolArgs": [
-        "--dart-define-from-file=.firebase/web.json"
+        "--dart-define-from-file=.firebase/web.json",
+        "--dart-define=ML_BACKEND_URL=http://127.0.0.1:8000"
       ]
     }
   ]

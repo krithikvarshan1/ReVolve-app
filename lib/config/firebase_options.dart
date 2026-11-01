@@ -7,15 +7,16 @@ class DefaultFirebaseOptions {
       return null;
     }
 
-    const fallbackApiKey = 'AIzaSyA6Nqf1wh-U2xXqzeMzknO6Q1URsBaP-E4';
-    const fallbackAppId = '1:391967469264:web:a9f6805da8074a8b6238d5';
-    const fallbackMessagingSenderId = '391967469264';
-    const fallbackProjectId = 'revolve-4edcf';
-    const fallbackAuthDomain = 'revolve-4edcf.firebaseapp.com';
-    const fallbackStorageBucket = 'revolve-4edcf.firebasestorage.app';
-    const fallbackMeasurementId = 'G-41ZB1QMH5Q';
-    const fallbackDatabaseUrl =
-      'https://revolve-4edcf-default-rtdb.firebaseio.com';
+    // Fallback values are empty – users MUST supply their own Firebase config
+    // via --dart-define or --dart-define-from-file.  See README for details.
+    const fallbackApiKey = '';
+    const fallbackAppId = '';
+    const fallbackMessagingSenderId = '';
+    const fallbackProjectId = '';
+    const fallbackAuthDomain = '';
+    const fallbackStorageBucket = '';
+    const fallbackMeasurementId = '';
+    const fallbackDatabaseUrl = '';
 
     const apiKey = String.fromEnvironment(
       'FIREBASE_WEB_API_KEY',

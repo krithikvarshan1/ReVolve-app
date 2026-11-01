@@ -13,7 +13,7 @@ class AppConfig {
   // Firebase Realtime Database root URL and telemetry path.
   static const String realtimeDatabaseUrl = String.fromEnvironment(
     'FIREBASE_RTDB_URL',
-    defaultValue: 'https://revolve-4edcf-default-rtdb.firebaseio.com',
+    defaultValue: '',
   );
   static const String realtimeSensorDataPath = String.fromEnvironment(
     'FIREBASE_RTDB_SENSOR_PATH',

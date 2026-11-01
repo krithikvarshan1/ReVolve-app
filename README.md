@@ -12,9 +12,9 @@ A comprehensive Flutter application for monitoring IoT sensor data, predicting p
 
 ### 🤖 Machine Learning Integration
 - Remaining Useful Life (RUL) prediction
-- Failure probability calculation
+- Fault classification & anomaly detection
+- LSTM-based temperature forecasting
 - AI-powered insights and recommendations
-- Degradation trend analysis
 
 ### 🚨 Alert System
 - Automatic anomaly detection
@@ -28,197 +28,154 @@ A comprehensive Flutter application for monitoring IoT sensor data, predicting p
 - Auto-shutdown safety features
 - Multi-device support
 
-### 📍 GPS Tracking
-- Device location monitoring
-- Google Maps integration
-- Real-time position updates
+### 💬 In-App Chat Assistant
+- Ollama LLM integration (optional)
+- Built-in fallback knowledge base
+- Context-aware help for all app features
 
 ### 🔐 Authentication
-- Firebase Authentication
-- Biometric authentication (Fingerprint)
+- Firebase Authentication (Email/Password, Google Sign-In)
+- Biometric authentication (Android)
 - Secure user management
 
 ### 📊 Usage & Maintenance Logs
 - Comprehensive logging system
-- Maintenance record tracking
-- Usage analytics
+- Downloadable CSV & PDF reports
+- Prediction history analytics
 
 ## Tech Stack
 
-- **Frontend**: Flutter (Android, iOS, Web, Desktop)
-- **Backend**: Firebase (Firestore, Auth)
-- **Maps**: Google Maps Flutter
-- **Charts**: FL Chart
-- **Authentication**: Local Auth + Firebase Auth
+- **Frontend**: Flutter (Android, Web)
+- **Backend**: FastAPI (Python) with ML model inference
+- **Database**: Firebase (Firestore + Realtime Database)
+- **ML Models**: XGBoost, Isolation Forest, LSTM (PyTorch)
+- **Chat**: Ollama (optional, falls back gracefully)
 - **State Management**: Provider
-- **ML**: Simulated (ready for Python backend integration)
+- **Charts**: FL Chart
 
 ## Project Structure
 
 ```
-lib/
-├── main.dart                 # App entry point
-├── config/
-│   └── app_config.dart       # App configuration
-├── models/
-│   ├── sensor_data.dart      # Sensor data model
-│   ├── alert.dart            # Alert model
-│   ├── device.dart           # Device model
-│   ├── user.dart             # User model
-│   └── ml_prediction.dart    # ML prediction model
-├── services/
-│   ├── sensor_service.dart   # Sensor data simulation
-│   ├── ml_service.dart       # ML prediction logic
-│   ├── firebase_service.dart # Firebase operations
-│   ├── device_control_service.dart # Device control
-│   ├── api_service.dart      # HTTP API calls
-│   └── auth_service.dart     # Authentication
-├── providers/
-│   ├── auth_provider.dart    # Auth state management
-│   ├── sensor_provider.dart  # Sensor data management
-│   ├── alert_provider.dart   # Alert management
-│   └── device_provider.dart  # Device management
-├── screens/
-│   ├── login_screen.dart     # Authentication screen
-│   └── dashboard_screen.dart # Main dashboard
-├── widgets/
-│   ├── custom_button.dart    # Reusable button
-│   ├── custom_text_field.dart # Reusable text field
-│   ├── sensor_chart.dart     # Chart widget
-│   └── alert_card.dart       # Alert display card
-├── utils/
-│   ├── constants.dart        # App constants
-│   └── helpers.dart          # Utility functions
-└── routes/
-    └── app_routes.dart       # App navigation routes
+├── backend/
+│   ├── main.py                 # FastAPI backend with ML inference
+│   └── requirements.txt        # Python dependencies
+├── models_ml/                  # Pre-trained ML models (.pkl, .pth)
+├── lib/
+│   ├── main.dart               # App entry point
+│   ├── config/
+│   │   ├── app_config.dart     # App configuration (env-driven)
+│   │   ├── firebase_bootstrap.dart
+│   │   └── firebase_options.dart
+│   ├── models/                 # Data models
+│   ├── services/               # Business logic & API calls
+│   ├── providers/              # State management
+│   ├── screens/                # UI screens
+│   ├── widgets/                # Reusable widgets
+│   ├── utils/                  # Constants & helpers
+│   └── routes/                 # Navigation
+├── .env.example                # Environment variable template
+├── .firebase/
+│   └── web.example.json        # Firebase config template
+└── web/                        # Web-specific assets
 ```
 
-## Setup Instructions
+## Quick Start
 
 ### Prerequisites
 
-1. **Flutter SDK**: Install Flutter (version 3.0.0 or higher)
-   ```bash
-   flutter --version
-   ```
+| Tool | Version | Install |
+|------|---------|---------|
+| Flutter SDK | ≥ 3.0.0 | [flutter.dev](https://docs.flutter.dev/get-started/install) |
+| Python | ≥ 3.9 | [python.org](https://python.org) |
+| Node.js | ≥ 18 | [nodejs.org](https://nodejs.org) |
 
-2. **Android Studio**: For Android development and emulator
-   - Install Android Studio
-   - Set up Android SDK (API 21+)
-   - Configure emulator or connect physical device
+### 1. Clone & Install
 
-3. **VS Code**: Recommended IDE
-   - Install Flutter and Dart extensions
+```bash
+git clone https://github.com/<your-username>/ReVolve-app.git
+cd ReVolve-app
 
-### Firebase Setup
+# Flutter dependencies
+flutter pub get
 
-1. **Create Firebase Project**
-   - Go to [Firebase Console](https://console.firebase.google.com/)
-   - Create a new project called "revolve"
+# Node dependencies (for dev script)
+npm install
 
-2. **Enable Services**
-   - Enable Firestore Database
-   - Enable Firebase Authentication
-   - Enable Google Sign-In
+# Python backend dependencies
+pip install -r backend/requirements.txt
+```
 
-3. **Add Android App**
-   - Package name: `com.example.revolve`
-   - Download `google-services.json`
-   - Place it in `android/app/src/main/` directory
+### 2. Configure Firebase
 
-4. **Firestore Security Rules** (Basic setup)
-   ```javascript
-   rules_version = '2';
-   service cloud.firestore {
-     match /databases/{database}/documents {
-       match /{document=**} {
-         allow read, write: if request.auth != null;
-       }
-     }
-   }
-   ```
+1. Create a Firebase project at [console.firebase.google.com](https://console.firebase.google.com/)
+2. Enable **Authentication** (Email/Password + Google Sign-In)
+3. Enable **Firestore Database**
+4. Enable **Realtime Database**
+5. Copy your web app config into `.firebase/web.json`:
 
-### Google Maps Setup
+```bash
+cp .firebase/web.example.json .firebase/web.json
+```
 
-1. **Get API Key**
-   - Go to [Google Cloud Console](https://console.cloud.google.com/)
-   - Enable Maps SDK for Android
-   - Create API key
+Then fill in the values:
 
-2. **Add to Android Manifest**
-   - Open `android/app/src/main/AndroidManifest.xml`
-   - Replace `YOUR_GOOGLE_MAPS_API_KEY_HERE` with your actual API key
+```json
+{
+  "FIREBASE_WEB_API_KEY": "your-api-key",
+  "FIREBASE_WEB_APP_ID": "your-app-id",
+  "FIREBASE_WEB_MESSAGING_SENDER_ID": "your-sender-id",
+  "FIREBASE_WEB_PROJECT_ID": "your-project-id",
+  "FIREBASE_WEB_AUTH_DOMAIN": "your-project.firebaseapp.com",
+  "FIREBASE_WEB_STORAGE_BUCKET": "your-project.appspot.com",
+  "FIREBASE_WEB_MEASUREMENT_ID": "G-XXXXXXXXXX"
+}
+```
 
-### Installation
+> [!NOTE]
+> The app works **without** Firebase — it will start in offline/demo mode with
+> limited functionality. Firebase is only needed for auth, cloud data, and live
+> sensor streaming.
 
-1. **Clone/Download the project**
-   ```bash
-   cd your-projects-directory
-   # Copy the revolve folder to your Flutter projects directory
-   ```
+### 3. (Optional) Configure Environment
 
-2. **Install Dependencies**
-   ```bash
-   cd revolve
-   flutter pub get
-   ```
+```bash
+cp .env.example .env
+# Edit .env with your values
+```
 
-3. **Run the App**
+### 4. Run
 
-   **On VS Code:**
-   - Open the project in VS Code
-   - Press F5 or go to Run > Start Debugging
-   - Select device (Android emulator/web)
+**Backend + Frontend together (recommended):**
 
-   **From Terminal:**
-   ```bash
-   flutter run
-   ```
+```bash
+npm run dev
+```
 
-   **For Android Device:**
-   ```bash
-   flutter run --device-id=YOUR_DEVICE_ID
-   ```
+**Or run separately:**
 
-   **For Web:**
-   ```bash
-   flutter run -d chrome
-   ```
+```bash
+# Terminal 1 – backend
+python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
 
-### Predictive Maintenance Backend (FastAPI)
+# Terminal 2 – Flutter web
+flutter run -d chrome \
+  --dart-define-from-file=.firebase/web.json \
+  --dart-define=ML_BACKEND_URL=http://127.0.0.1:8000
+```
 
-The project now includes a Python backend in `backend/` that loads all trained
-models from `models_ml/` once at startup and exposes a single unified endpoint.
+**VS Code:** Press F5 — the included launch configuration handles Firebase config injection.
 
-1. **Install backend dependencies**
-   ```bash
-   pip install -r backend/requirements.txt
-   ```
+### 5. (Optional) Ollama Chat
 
-2. **Install Node scripts dependency (one time)**
-   ```bash
-   npm install
-   ```
+For LLM-powered chat assistance:
 
-3. **Run backend + Flutter together**
-   ```bash
-   npm run dev
-   ```
+```bash
+# Install Ollama: https://ollama.com
+ollama pull llama3
+ollama serve
+```
 
-4. **Optional: run backend only**
-   ```bash
-   python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000
-   ```
-
-5. **Optional: run Flutter only with backend URL**
-   ```bash
-   flutter run -d chrome --dart-define=ML_BACKEND_URL=http://127.0.0.1:8000
-   ```
-
-6. **API endpoint**
-   - `POST /predictive-maintenance`
-   - Expected sensor payload keys:
-     `temperature`, `vibration`, `current`, `gas`, `dust`, `sound`, `deviceId`
+The backend auto-detects Ollama. If unavailable, the chat falls back to a built-in knowledge base.
 
 ## ESP32 Hardware Integration
 
@@ -233,130 +190,67 @@ models from `models_ml/` once at startup and exposes a single unified endpoint.
 
 ### ESP32 API Endpoints
 
-The ESP32 should expose these endpoints:
+The ESP32 should expose:
 
-```cpp
-// GET /sensor-data
+```
+GET  /sensor-data     → { temperature, vibration, current, gas, sound, timestamp, deviceId }
+POST /relay-control   → { deviceId, status }
+```
+
+Update `lib/config/app_config.dart` with your ESP32 IP:
+
+```dart
+static const String baseUrl = 'http://YOUR_ESP32_IP:8080';
+```
+
+## API Reference
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/` | API info |
+| GET | `/health` | Model & Ollama status |
+| POST | `/predictive-maintenance` | Run ML inference |
+| POST | `/chat-assistant` | Chat with assistant |
+| GET | `/debug-models` | Model diagnostics |
+
+### Predictive Maintenance Payload
+
+```json
 {
-  "temperature": 25.5,
+  "temperature": 45.0,
   "vibration": 2.1,
   "current": 5.2,
   "gas": 150.0,
-  "sound": 45.0,
-  "timestamp": "2024-01-01T12:00:00Z",
+  "dust": 80.0,
+  "sound": 50.0,
   "deviceId": "esp32-001"
 }
-
-// POST /relay-control
-// Body: {"deviceId": "esp32-001", "status": true}
 ```
 
-### Integration Steps
+## Troubleshooting
 
-1. **Update API URLs** in `lib/config/app_config.dart`:
-   ```dart
-   static const String baseUrl = 'http://YOUR_ESP32_IP:8080';
-   ```
-
-2. **Uncomment API calls** in services:
-   - `sensor_service.dart`: Use `fetchSensorDataFromESP32()`
-   - `device_control_service.dart`: Use actual HTTP calls
-
-## Python ML Backend Integration
-
-### Backend Requirements
-- Flask/FastAPI server
-- Scikit-learn or TensorFlow
-- Pandas for data processing
-
-### ML API Endpoint
-
-```python
-# POST /predict
-# Input: sensor history data
-# Output: ML predictions
-
-@app.route('/predict', methods=['POST'])
-def predict():
-    data = request.json['sensor_history']
-    # ML prediction logic here
-    return {
-        'remainingUsefulLife': 1500.0,
-        'failureProbability': 0.15,
-        'insights': ['Temperature spikes detected', 'System efficiency dropping'],
-        'degradationTrend': {'temperature': 0.02, 'vibration': 0.01}
-    }
-```
-
-### Integration Steps
-
-1. **Update API URL** in `lib/config/app_config.dart`
-
-2. **Uncomment ML API calls** in `ml_service.dart`:
-   ```dart
-   return await predictFromAPI(sensorHistory);
-   ```
-
-## Common Issues & Fixes
-
-### Flutter Issues
 ```bash
-# Clean and rebuild
-flutter clean
-flutter pub get
+# Clean Flutter build
+flutter clean && flutter pub get
 
-# Check devices
+# Check connected devices
 flutter devices
 
-# Run with verbose logging
+# Verbose Flutter run
 flutter run -v
+
+# Test backend independently
+curl http://127.0.0.1:8000/health
 ```
-
-### Android Issues
-- **SDK Issues**: Ensure Android SDK 21+ is installed
-- **Emulator**: Create AVD with API 21+
-- **Permissions**: Check device permissions in AndroidManifest.xml
-
-### Firebase Issues
-- **google-services.json**: Ensure file is in correct location
-- **SHA-1**: Add SHA-1 fingerprint for Android app
-
-### Maps Issues
-- **API Key**: Ensure Maps API is enabled and key is correct
-- **Billing**: Enable billing for Maps API usage
-
-## Development Workflow
-
-1. **VS Code**: Primary development environment
-2. **Android Studio**: For Android-specific debugging and emulator
-3. **Hot Reload**: Use `r` in terminal for hot reload during development
-4. **Testing**: Run `flutter test` for unit tests
-
-## Future Enhancements
-
-- [ ] Real ESP32 integration
-- [ ] Python ML backend
-- [ ] Push notifications
-- [ ] Offline data sync
-- [ ] Multi-device dashboard
-- [ ] Advanced analytics
-- [ ] Predictive maintenance scheduling
 
 ## Contributing
 
 1. Fork the repository
-2. Create feature branch
-3. Commit changes
-4. Push to branch
+2. Create feature branch (`git checkout -b feature/amazing-feature`)
+3. Commit changes (`git commit -m 'Add amazing feature'`)
+4. Push to branch (`git push origin feature/amazing-feature`)
 5. Create Pull Request
 
 ## License
 
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## Support
-
-For support and questions:
-- Create an issue in the repository
-- Check the documentation
-- Review the code comments for implementation details
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

@@ -44,3 +44,31 @@ app.*.map.json
 /android/app/debug
 /android/app/profile
 /android/app/release
+
+# Secrets & environment files
+.env
+.env.*
+!.env.example
+
+# Android local config (contains machine-specific SDK paths)
+android/local.properties
+
+# Firebase config files with real keys
+.firebase/web.json
+google-services.json
+**/google-services.json
+GoogleService-Info.plist
+**/GoogleService-Info.plist
+
+# Gradle caches (should never be committed)
+**/.gradle/
+
+# Python virtual environment
+.venv/
+__pycache__/
+*.pyc
+
+# Keystores and signing
+*.jks
+*.keystore
+key.properties
