@@ -251,6 +251,3 @@ curl http://127.0.0.1:8000/health
 4. Push to branch (`git push origin feature/amazing-feature`)
 5. Create Pull Request
 
-## License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
